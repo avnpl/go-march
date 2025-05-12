@@ -1,28 +1,23 @@
 package models
 
-type Post struct {
-	PostID    string `db:"post_id"`
-	Title     string `db:"title"`
-	Body      string `db:"body"`
-	AuthorID  string `db:"author_id"`
+type Product struct {
+	ProductID string `db:"prod_id"`
+	Name      string `db:"prod_name"`
+	Price     int    `db:"price"`
+	Stock     int    `db:"stock"`
 	CreatedAt string `db:"created_at"`
-	UpdatedAt string `db:"updated_at"`
 }
 
-type Transaction struct {
-	TxnID        string `db:"txn_id"`
-	Amount       int    `db:"amount"`
-	SourceUserID string `db:"source_user_id"`
-	TargetUserID string `db:"target_user_id"`
-	CreatedAt    string `db:"created_at"`
-	UpdatedAt    string `db:"updated_at"`
+type Orders struct {
+	OrderID   string `db:"order_id"`
+	Quantity  int    `db:"quantity"`
+	ProductID string `db:"product_id"`
+	Amount    string `db:"total_price"`
+	CreatedAt string `db:"order_time"`
 }
 
-type User struct {
-	UserID    string `db:"user_id"`
-	Username  string `db:"username"`
-	Bio       string `db:"bio"`
-	EmailID   string `db:"email_id"`
-	CreatedAt string `db:"created_at"`
-	UpdatedAt string `db:"updated_at"`
+type CreateProductReq struct {
+	Name  string `json:"name" validate:"required"`
+	Price int    `json:"price" validate:"required"`
+	Stock int    `json:"stock" validate:"required"`
 }
