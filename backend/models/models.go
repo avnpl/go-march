@@ -1,11 +1,11 @@
 package models
 
 type Product struct {
-	ProductID string `db:"prod_id"`
-	Name      string `db:"prod_name"`
-	Price     int    `db:"price"`
-	Stock     int    `db:"stock"`
-	CreatedAt string `db:"created_at"`
+	ProductID string  `db:"prod_id"`
+	Name      string  `db:"prod_name"`
+	Price     float64 `db:"price"`
+	Stock     int     `db:"stock"`
+	CreatedAt string  `db:"created_at"`
 }
 
 type Orders struct {
@@ -17,7 +17,7 @@ type Orders struct {
 }
 
 type CreateProductReq struct {
-	Name  string `json:"name" validate:"required"`
-	Price int    `json:"price" validate:"required"`
-	Stock int    `json:"stock" validate:"required"`
+	Name  string  `json:"name" validate:"required"`
+	Price float64 `json:"price" validate:"required"`
+	Stock int     `json:"stock" validate:"required"`
 }

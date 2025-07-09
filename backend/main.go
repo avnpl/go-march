@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/avnpl/go-march/utils"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +12,7 @@ import (
 	"github.com/avnpl/go-march/handlers"
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/services"
+	"github.com/avnpl/go-march/utils"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -19,12 +20,33 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+func buildLogger() (*zap.Logger, error) {
+	// Start from the ProductionConfig so you get JSON output, but
+	// raise the level to DEBUG and add caller info + stacktrace.
+	loggerConfig := zap.NewProductionConfig()
+	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel) // DEBUG+
+	loggerConfig.Encoding = "console"
+	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	loggerConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	loggerConfig.EncoderConfig.TimeKey = "ts"
+	// Build it, enabling caller info and Error‐level stacktraces:
+	return loggerConfig.Build(
+		zap.AddCaller(),                   // include file:line in every log
+		zap.AddStacktrace(zap.ErrorLevel), // attach stacktrace on Error+
+	)
+}
+
 func main() {
-	// --- Logger ---
-	enc := zap.NewProductionEncoderConfig()
-	enc.EncodeTime = zapcore.ISO8601TimeEncoder
-	core := zapcore.NewCore(zapcore.NewJSONEncoder(enc), zapcore.Lock(os.Stdout), zapcore.InfoLevel)
-	logger := zap.New(core)
+	// Setup logging
+	//enc := zap.NewProductionEncoderConfig()
+	//enc.EncodeTime = zapcore.ISO8601TimeEncoder
+	//core := zapcore.NewCore(zapcore.NewConsoleEncoder(enc), zapcore.Lock(os.Stdout), zapcore.DebugLevel)
+	//logger := zap.New(core)
+
+	logger, err := buildLogger()
+	if err != nil {
+		log.Fatal("cannot build logger", err)
+	}
 	defer logger.Sync()
 
 	// --- DB ---
@@ -38,15 +60,15 @@ func main() {
 	}
 	defer db.Close()
 
-	// --- DI Layers ---
-	repo := repos.NewPostgresProductRepo(db)
-	//validator := validate.NewValidator()
+	// Initialize the layers
+	repo := repos.NewPGProductRepo(db)
 	svc := services.NewProductService(repo, logger)
 	h := handlers.NewProductHandler(svc, logger)
 
-	// --- HTTP Setup ---
+	// Set up the HTTP server
 	mux := http.NewServeMux()
 	mux.HandleFunc("/products", h.CreateProduct)
+	mux.HandleFunc("/product/{id}", h.FetchProduct)
 
 	srv := &http.Server{
 		Addr:         ":8080",
@@ -56,7 +78,7 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	// --- Run Server ---
+	// Start the server in a separate GR
 	go func() {
 		logger.Info("listening on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -64,11 +86,11 @@ func main() {
 		}
 	}()
 
-	// --- Graceful Shutdown ---
+	// Graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
-	logger.Info("shutting down")
+	logger.Info("Shutting down")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

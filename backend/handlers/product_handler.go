@@ -1,18 +1,23 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"strconv"
+
+	utilErrs "github.com/avnpl/go-march/utils/errors"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
+	"github.com/avnpl/go-march/utils"
 
 	"go.uber.org/zap"
 )
 
-// ProductHandler holds our dependencies.
 type ProductHandler struct {
 	svc services.ProductService
 	log *zap.Logger
@@ -22,27 +27,79 @@ func NewProductHandler(svc services.ProductService, log *zap.Logger) *ProductHan
 	return &ProductHandler{svc: svc, log: log}
 }
 
-// CreateProduct implements POST slash products
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(),
+			zap.Error(err))
+		http.Error(w, utilErrs.ErrInternal.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	reqString, err := utils.GetRequestBodyAsString(bodyBytes)
+	if err != nil {
+		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(),
+			zap.Error(err))
+		http.Error(w, utilErrs.ErrInternal.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	h.log.Debug("raw body",
+		zap.Int("length", len(bodyBytes)),
+		zap.String("body", reqString),
+	)
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
 	var req models.CreateProductReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
-		fmt.Println(req)
-		fmt.Println(err)
+		h.log.Error(fmt.Errorf("invalid JSON : %w", err).Error())
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 	prod, err := h.svc.CreateProduct(r.Context(), &req)
 	if err != nil {
-		if errors.Is(err, fmt.Errorf("ErrConflict")) {
+		if errors.Is(err, utilErrs.ErrConflict) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
 		h.log.Error("CreateProduct failed", zap.Error(err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(prod)
+}
+
+func (h *ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		h.log.Error(fmt.Errorf("no ID provided in request").Error())
+		http.Error(w, utilErrs.ErrInvalidRequest.Error(), http.StatusBadRequest)
+		return
+	}
+
+	h.log.Debug("received ID => ", zap.String("body", idStr))
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	prod, err := h.svc.GetProductByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, utilErrs.ErrConflict) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		h.log.Error("GetProductByID failed", zap.Error(err))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -6,6 +6,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
+	github.com/pkg/errors v0.8.1
 	go.uber.org/zap v1.13.0
 )
 
