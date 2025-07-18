@@ -21,3 +21,10 @@ type CreateProductReq struct {
 	Price float64 `json:"price" validate:"required"`
 	Stock int     `json:"stock" validate:"required"`
 }
+
+type UpdateProductReq struct {
+	ProductID *string  `json:"prod_id" validate:"required"`
+	Name      *string  `json:"name,omitempty"`
+	Price     *float64 `json:"price,omitempty"`
+	Stock     *int     `json:"stock,omitempty"`
+}

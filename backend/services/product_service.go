@@ -12,8 +12,8 @@ import (
 type ProductService interface {
 	CreateProduct(ctx context.Context, req *models.CreateProductReq) (*models.Product, error)
 	GetProductByID(ctx context.Context, id int64) (models.Product, error)
+	UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (*models.Product, error)
 	//DeleteProduct(ctx context.Context, id int64) error
-	// UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductRequest) (*models.Product, error)
 }
 
 type productService struct {
@@ -50,4 +50,8 @@ func (s *productService) GetProductByID(ctx context.Context, id int64) (models.P
 	}
 
 	return res, nil
+}
+
+func (s *productService) UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (*models.Product, error) {
+
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -29,6 +30,7 @@ func buildLogger() (*zap.Logger, error) {
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	loggerConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	loggerConfig.EncoderConfig.TimeKey = "ts"
+
 	// Build it, enabling caller info and Error‐level stacktraces:
 	return loggerConfig.Build(
 		zap.AddCaller(),                   // include file:line in every log
@@ -37,12 +39,6 @@ func buildLogger() (*zap.Logger, error) {
 }
 
 func main() {
-	// Setup logging
-	//enc := zap.NewProductionEncoderConfig()
-	//enc.EncodeTime = zapcore.ISO8601TimeEncoder
-	//core := zapcore.NewCore(zapcore.NewConsoleEncoder(enc), zapcore.Lock(os.Stdout), zapcore.DebugLevel)
-	//logger := zap.New(core)
-
 	logger, err := buildLogger()
 	if err != nil {
 		log.Fatal("cannot build logger", err)
@@ -69,6 +65,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/products", h.CreateProduct)
 	mux.HandleFunc("/product/{id}", h.FetchProduct)
+	mux.HandleFunc("/product", h.UpdateProduct)
 
 	srv := &http.Server{
 		Addr:         ":8080",
@@ -81,7 +78,7 @@ func main() {
 	// Start the server in a separate GR
 	go func() {
 		logger.Info("listening on :8080")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("serve error", zap.Error(err))
 		}
 	}()

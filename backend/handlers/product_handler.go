@@ -106,3 +106,7 @@ func (h *ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(prod)
 }
+
+func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+
+}
