@@ -3,8 +3,6 @@ package repos
 import (
 	"context"
 	"fmt"
-	"strconv"
-
 	utilErrs "github.com/avnpl/go-march/utils/errors"
 	"strings"
 
@@ -15,7 +13,7 @@ import (
 type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) error
 	FetchByID(ctx context.Context, id int64) (models.Product, error)
-	UpdateByID(ctx *context.Context, id *int64, p *models.Product) (models.Product, error)
+	UpdateByID(ctx *context.Context, id int64, p *models.UpdateProductReq) (*models.Product, error)
 }
 
 type pgProductRepo struct {
@@ -51,22 +49,22 @@ func (r pgProductRepo) FetchByID(ctx context.Context, id int64) (models.Product,
 	return result, nil
 }
 
-func (r pgProductRepo) UpdateByID(ctx *context.Context, id *int64, p *models.Product) (models.Product, error) {
+func (r pgProductRepo) UpdateByID(ctx *context.Context, id int64, p *models.UpdateProductReq) (*models.Product, error) {
 	query := "UPDATE products SET "
 	args := make(map[string]interface{})
-	fieldsToUpdate := []string{}
+	var fieldsToUpdate []string
 
-	if p.Name != "" {
+	if p.Name != nil && *p.Name != "" {
 		fieldsToUpdate = append(fieldsToUpdate, "prod_name = :prod_name")
 		args["prod_name"] = p.Name
 	}
 
-	if p.Stock != 0 {
+	if p.Stock != nil && *p.Stock != 0 {
 		fieldsToUpdate = append(fieldsToUpdate, "stock = :stock")
 		args["stock"] = p.Stock
 	}
 
-	if p.Price != 0 {
+	if p.Price != nil && *p.Price != 0 {
 		fieldsToUpdate = append(fieldsToUpdate, "price = :price")
 		args["price"] = p.Price
 	}
@@ -76,7 +74,7 @@ func (r pgProductRepo) UpdateByID(ctx *context.Context, id *int64, p *models.Pro
 	query += " WHERE prod_id = :prod_id"
 	args["prod_id"] = p.ProductID
 
-	result, err := r.db.NamedExecContext(ctx, query, args)
+	result, err := r.db.NamedExecContext(*ctx, query, args)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique") {
 			return nil, fmt.Errorf("repo.Update conflict: %w", err)
@@ -92,8 +90,7 @@ func (r pgProductRepo) UpdateByID(ctx *context.Context, id *int64, p *models.Pro
 		return nil, fmt.Errorf("repo.Update: %w", utilErrs.ErrRecordNotFound)
 	}
 
-	id, err = strconv.ParseInt(p.ProductID, 10, 64)
 	updatedProduct, err := r.FetchByID(*ctx, id)
 
-	return updatedProduct, nil
+	return &updatedProduct, nil
 }

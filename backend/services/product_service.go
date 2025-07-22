@@ -53,5 +53,10 @@ func (s *productService) GetProductByID(ctx context.Context, id int64) (models.P
 }
 
 func (s *productService) UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (*models.Product, error) {
-
+	res, err := s.repo.UpdateByID(&ctx, id, req)
+	if err != nil {
+		return nil, fmt.Errorf("service update: %w", err)
+	}
+	s.log.Info("updated product", zap.String("prod_id", res.ProductID))
+	return res, nil
 }

@@ -63,9 +63,14 @@ func main() {
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/products", h.CreateProduct)
 	mux.HandleFunc("/product/{id}", h.FetchProduct)
-	mux.HandleFunc("/product", h.UpdateProduct)
+	mux.HandleFunc("/product", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			h.CreateProduct(w, r)
+		} else {
+			h.UpdateProduct(w, r)
+		}
+	})
 
 	srv := &http.Server{
 		Addr:         ":8080",
