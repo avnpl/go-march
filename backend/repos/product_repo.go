@@ -3,7 +3,7 @@ package repos
 import (
 	"context"
 	"fmt"
-	utilErrs "github.com/avnpl/go-march/utils/errors"
+	utilErrs "github.com/avnpl/go-march/utils"
 	"strings"
 
 	"github.com/avnpl/go-march/models"

@@ -9,10 +9,9 @@ import (
 	"net/http"
 	"strconv"
 
-	utilErrs "github.com/avnpl/go-march/utils/errors"
-
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
+	utilErrs "github.com/avnpl/go-march/utils"
 	"go.uber.org/zap"
 )
 
