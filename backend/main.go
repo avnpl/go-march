@@ -22,19 +22,24 @@ import (
 )
 
 func buildLogger() (*zap.Logger, error) {
-	// Start from the ProductionConfig so you get JSON output, but
-	// raise the level to DEBUG and add caller info + stacktrace.
-	loggerConfig := zap.NewProductionConfig()
-	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel) // DEBUG+
-	loggerConfig.Encoding = "console"
+	loggerConfig := zap.NewDevelopmentConfig()
+
+	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	loggerConfig.Development = true
+	loggerConfig.EncoderConfig.TimeKey = "ts"
+	loggerConfig.EncoderConfig.MessageKey = "event"
+	loggerConfig.EncoderConfig.CallerKey = "caller"
+	loggerConfig.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	loggerConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	loggerConfig.EncoderConfig.TimeKey = "ts"
+	loggerConfig.EncoderConfig.EncodeDuration = zapcore.SecondsDurationEncoder
+	loggerConfig.Encoding = "console"
+	loggerConfig.OutputPaths = []string{"stdout", "logs/app.log"}
+	loggerConfig.ErrorOutputPaths = []string{"stderr", "logs/app.log"}
+	loggerConfig.DisableStacktrace = false
 
-	// Build it, enabling caller info and Error‐level stacktraces:
 	return loggerConfig.Build(
-		zap.AddCaller(),                   // include file:line in every log
-		zap.AddStacktrace(zap.ErrorLevel), // attach stacktrace on Error+
+		zap.AddStacktrace(zap.ErrorLevel),
 	)
 }
 
