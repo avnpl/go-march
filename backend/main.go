@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,49 +15,14 @@ import (
 	"github.com/avnpl/go-march/utils"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
-func buildLogger() (*zap.Logger, error) {
-	loggerConfig := zap.NewDevelopmentConfig()
-
-	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
-	loggerConfig.Development = true
-	loggerConfig.EncoderConfig.TimeKey = "ts"
-	loggerConfig.EncoderConfig.MessageKey = "event"
-	loggerConfig.EncoderConfig.CallerKey = "caller"
-	loggerConfig.EncoderConfig.EncodeCaller = zapcore.ShortCallerEncoder
-	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	loggerConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	loggerConfig.EncoderConfig.EncodeDuration = zapcore.SecondsDurationEncoder
-	loggerConfig.Encoding = "console"
-	loggerConfig.OutputPaths = []string{"stdout", "logs/app.log"}
-	loggerConfig.ErrorOutputPaths = []string{"stderr", "logs/app.log"}
-	loggerConfig.DisableStacktrace = false
-
-	return loggerConfig.Build(
-		zap.AddStacktrace(zap.ErrorLevel),
-	)
-}
-
 func main() {
-	logger, err := buildLogger()
-	if err != nil {
-		log.Fatal("cannot build logger", err)
-	}
+	logger := utils.BuildLogger()
 	defer logger.Sync()
 
-	// --- DB ---
-	dsn := utils.GetEnvVar("DB_URL")
-	if dsn == "" {
-		logger.Fatal("DB_URL not set")
-	}
-	db, err := sqlx.Connect("pgx", dsn)
-	if err != nil {
-		logger.Fatal("db connect failed", zap.Error(err))
-	}
+	db := utils.GetDBPoolObject(logger)
 	defer db.Close()
 
 	// Initialize the layers
@@ -71,9 +35,9 @@ func main() {
 	mux.HandleFunc("/product/{id}", h.FetchProduct)
 	mux.HandleFunc("/product", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPatch {
-			h.CreateProduct(w, r)
-		} else {
 			h.UpdateProduct(w, r)
+		} else {
+			h.CreateProduct(w, r)
 		}
 	})
 
