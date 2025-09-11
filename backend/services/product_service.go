@@ -10,10 +10,10 @@ import (
 )
 
 type ProductService interface {
-	CreateProduct(ctx context.Context, req *models.CreateProductReq) (*models.Product, error)
+	CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error)
 	GetProductByID(ctx context.Context, id int64) (models.Product, error)
-	UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (*models.Product, error)
-	//DeleteProduct(ctx context.Context, id int64) error
+	UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (models.Product, error)
+	DeleteProduct(ctx context.Context, id int64) (models.Product, error)
 }
 
 type productService struct {
@@ -25,17 +25,17 @@ func NewProductService(r repos.ProductRepo, l *zap.Logger) ProductService {
 	return &productService{repo: r, log: l}
 }
 
-func (s *productService) CreateProduct(ctx context.Context, req *models.CreateProductReq) (*models.Product, error) {
+func (s *productService) CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error) {
 	// TODO Validate request
 
-	p := &models.Product{
+	p := models.Product{
 		Name:  req.Name,
 		Price: req.Price,
 		Stock: req.Stock,
 	}
 
 	if err := s.repo.Create(ctx, p); err != nil {
-		return nil, fmt.Errorf("service create: %w", err)
+		return models.Product{}, fmt.Errorf("service create: %w", err)
 	}
 
 	s.log.Info("created product", zap.String("prod_id", p.ProductID))
@@ -52,11 +52,21 @@ func (s *productService) GetProductByID(ctx context.Context, id int64) (models.P
 	return res, nil
 }
 
-func (s *productService) UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (*models.Product, error) {
+func (s *productService) UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (models.Product, error) {
 	res, err := s.repo.UpdateByID(&ctx, id, req)
 	if err != nil {
-		return nil, fmt.Errorf("service update: %w", err)
+		return models.Product{}, fmt.Errorf("service update: %w", err)
 	}
 	s.log.Info("updated product", zap.String("prod_id", res.ProductID))
+	return res, nil
+}
+
+func (s *productService) DeleteProduct(ctx context.Context, id int64) (models.Product, error) {
+	res, err := s.repo.DeleteByID(ctx, id)
+	if err != nil {
+		return models.Product{}, fmt.Errorf("service delete : %w", err)
+	}
+
+	s.log.Info("deleted product", zap.String("prod_id", res.ProductID))
 	return res, nil
 }

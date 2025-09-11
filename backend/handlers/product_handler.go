@@ -20,16 +20,11 @@ type ProductHandler struct {
 	log *zap.Logger
 }
 
-func NewProductHandler(svc services.ProductService, log *zap.Logger) *ProductHandler {
-	return &ProductHandler{svc: svc, log: log}
+func NewProductHandler(svc services.ProductService, log *zap.Logger) ProductHandler {
+	return ProductHandler{svc: svc, log: log}
 }
 
-func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(),
@@ -66,12 +61,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(prod)
 }
 
-func (h *ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	if idStr == "" {
 		h.log.Error(fmt.Errorf("no ID provided in request").Error())
@@ -94,15 +84,10 @@ func (h *ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(prod)
+	_ = json.NewEncoder(w).Encode(prod)
 }
 
-func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPatch {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(),
@@ -133,6 +118,32 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		h.log.Error("UpdateProduct failed", zap.Error(err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(prod)
+}
+
+func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		h.log.Error(fmt.Errorf("no ID provided in request").Error())
+		http.Error(w, utilErrs.ErrInvalidRequest.Error(), http.StatusBadRequest)
+		return
+	}
+
+	h.log.Debug("received ID => ", zap.String("request param", idStr))
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	prod, err := h.svc.DeleteProduct(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, utilErrs.ErrConflict) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		h.log.Error("DeleteProductByID failed", zap.Error(err))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

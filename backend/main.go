@@ -32,12 +32,26 @@ func main() {
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/product/{id}", h.FetchProduct)
 	mux.HandleFunc("/product", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPatch {
+		switch r.Method {
+		case http.MethodPatch:
 			h.UpdateProduct(w, r)
-		} else {
+		case http.MethodPost:
 			h.CreateProduct(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+	})
+	mux.HandleFunc("/product/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodDelete:
+			h.DeleteProduct(w, r)
+		case http.MethodGet:
+			h.FetchProduct(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
 	})
 
