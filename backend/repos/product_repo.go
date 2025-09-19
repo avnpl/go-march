@@ -12,7 +12,7 @@ import (
 )
 
 type ProductRepo interface {
-	Create(ctx context.Context, p models.Product) error
+	Create(ctx context.Context, p models.Product) (models.Product, error)
 	FetchByID(ctx context.Context, id int64) (models.Product, error)
 	UpdateByID(ctx *context.Context, id int64, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id int64) (models.Product, error)
@@ -26,18 +26,17 @@ func NewPGProductRepo(db *sqlx.DB) ProductRepo {
 	return pgProductRepo{db: db}
 }
 
-func (r pgProductRepo) Create(ctx context.Context, p models.Product) error {
-	const query = "INSERT INTO products (prod_name, price, stock) VALUES ($1, $2, $3) RETURNING prod_id, created_at"
+func (r pgProductRepo) Create(ctx context.Context, p models.Product) (models.Product, error) {
+	const query = "INSERT INTO products (prod_name, price, stock) VALUES ($1, $2, $3) RETURNING *"
 
-	if err := r.db.QueryRowContext(ctx, query, p.Name, p.Price, p.Stock).
-		Scan(&p.ProductID, &p.CreatedAt); err != nil {
-
+	var res models.Product
+	if err := r.db.GetContext(ctx, &res, query, p.Name, p.Price, p.Stock); err != nil {
 		if strings.Contains(err.Error(), "unique") {
-			return fmt.Errorf("repo.Create conflict: %w", err)
+			return models.Product{}, fmt.Errorf("repo.Create conflict: %w", err)
 		}
-		return fmt.Errorf("repo.Create: %w", err)
+		return models.Product{}, fmt.Errorf("repo.Create: %w", err)
 	}
-	return nil
+	return res, nil
 }
 
 func (r pgProductRepo) FetchByID(ctx context.Context, id int64) (models.Product, error) {
@@ -55,6 +54,7 @@ func (r pgProductRepo) UpdateByID(ctx *context.Context, id int64, p *models.Upda
 	query := "UPDATE products SET "
 	args := make(map[string]interface{})
 	var fieldsToUpdate []string
+	var res models.Product
 
 	if p.Name != nil && *p.Name != "" {
 		fieldsToUpdate = append(fieldsToUpdate, "prod_name = :prod_name")
@@ -73,10 +73,10 @@ func (r pgProductRepo) UpdateByID(ctx *context.Context, id int64, p *models.Upda
 
 	fieldsToUpdate = append(fieldsToUpdate, "updated_at = NOW()")
 	query += strings.Join(fieldsToUpdate, ", ")
-	query += " WHERE prod_id = :prod_id"
+	query += " WHERE prod_id = :prod_id RETURNING *"
 	args["prod_id"] = p.ProductID
 
-	result, err := r.db.NamedExecContext(*ctx, query, args)
+	result, err := r.db.NamedQueryContext(*ctx, query, args)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique") {
 			return models.Product{}, fmt.Errorf("repo.Update conflict: %w", err)
@@ -84,17 +84,16 @@ func (r pgProductRepo) UpdateByID(ctx *context.Context, id int64, p *models.Upda
 		return models.Product{}, fmt.Errorf("repo.Update: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return models.Product{}, fmt.Errorf("repo.Update: could not get rows affected: %w", err)
-	}
-	if rowsAffected == 0 {
+	if result.Next() {
+		err := result.StructScan(&res)
+		if err != nil {
+			return models.Product{}, fmt.Errorf("repo.Update: %w", err)
+		}
+	} else {
 		return models.Product{}, fmt.Errorf("repo.Update: %w", utilErrs.ErrRecordNotFound)
 	}
 
-	updatedProduct, err := r.FetchByID(*ctx, id)
-
-	return updatedProduct, nil
+	return res, nil
 }
 
 func (r pgProductRepo) DeleteByID(ctx context.Context, id int64) (models.Product, error) {

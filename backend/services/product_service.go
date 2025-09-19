@@ -34,12 +34,13 @@ func (s *productService) CreateProduct(ctx context.Context, req *models.CreatePr
 		Stock: req.Stock,
 	}
 
-	if err := s.repo.Create(ctx, p); err != nil {
+	res, err := s.repo.Create(ctx, p)
+	if err != nil {
 		return models.Product{}, fmt.Errorf("service create: %w", err)
 	}
 
 	s.log.Info("created product", zap.String("prod_id", p.ProductID))
-	return p, nil
+	return res, nil
 }
 
 func (s *productService) GetProductByID(ctx context.Context, id int64) (models.Product, error) {
