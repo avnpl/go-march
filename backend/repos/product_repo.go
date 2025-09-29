@@ -31,9 +31,6 @@ func (r pgProductRepo) Create(ctx context.Context, p models.Product) (models.Pro
 
 	var res models.Product
 	if err := r.db.GetContext(ctx, &res, query, p.Name, p.Price, p.Stock); err != nil {
-		if strings.Contains(err.Error(), "unique") {
-			return models.Product{}, fmt.Errorf("repo.Create conflict: %w", err)
-		}
 		return models.Product{}, fmt.Errorf("repo.Create: %w", err)
 	}
 	return res, nil

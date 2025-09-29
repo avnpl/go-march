@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,7 +30,7 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(),
 			zap.Error(err))
-		http.Error(w, utilErrs.ErrInternal.Error(), http.StatusInternalServerError)
+		utilErrs.SendInternalError(w)
 		return
 	}
 
@@ -43,16 +44,16 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateProductReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.log.Error(fmt.Errorf("invalid JSON : %w", err).Error())
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 	prod, err := h.svc.CreateProduct(r.Context(), &req)
 	if err != nil {
 		if errors.Is(err, utilErrs.ErrConflict) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			utilErrs.SendJSONError(w, http.StatusConflict, "")
 			return
 		}
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		utilErrs.SendInternalError(w)
 		h.log.Error("CreateProduct failed", zap.Error(err))
 		return
 	}
@@ -65,7 +66,7 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	if idStr == "" {
 		h.log.Error(fmt.Errorf("no ID provided in request").Error())
-		http.Error(w, utilErrs.ErrInvalidRequest.Error(), http.StatusBadRequest)
+		utilErrs.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
 		return
 	}
 
@@ -74,12 +75,12 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	prod, err := h.svc.GetProductByID(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, utilErrs.ErrConflict) {
-			http.Error(w, err.Error(), http.StatusConflict)
+		h.log.Error("GetProductByID failed", zap.Error(err))
+		if errors.As(err, &sql.ErrNoRows) {
+			utilErrs.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")
 			return
 		}
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		h.log.Error("GetProductByID failed", zap.Error(err))
+		utilErrs.SendInternalError(w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -92,7 +93,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(),
 			zap.Error(err))
-		http.Error(w, utilErrs.ErrInternal.Error(), http.StatusInternalServerError)
+		utilErrs.SendInternalError(w)
 		return
 	}
 
@@ -106,7 +107,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	var req models.UpdateProductReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.log.Error(fmt.Errorf("invalid JSON : %w", err).Error())
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid JSON in the Request Body")
 		return
 	}
 
@@ -116,7 +117,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		http.Error(w, "Internal error", http.StatusInternalServerError)
+		utilErrs.SendInternalError(w)
 		h.log.Error("UpdateProduct failed", zap.Error(err))
 		return
 	}
@@ -129,7 +130,7 @@ func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	if idStr == "" {
 		h.log.Error(fmt.Errorf("no ID provided in request").Error())
-		http.Error(w, utilErrs.ErrInvalidRequest.Error(), http.StatusBadRequest)
+		utilErrs.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
 		return
 	}
 
@@ -138,12 +139,12 @@ func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	prod, err := h.svc.DeleteProduct(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, utilErrs.ErrConflict) {
-			http.Error(w, err.Error(), http.StatusConflict)
+		if errors.As(err, &sql.ErrNoRows) {
+			utilErrs.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")
 			return
 		}
-		http.Error(w, "Internal error", http.StatusInternalServerError)
 		h.log.Error("DeleteProductByID failed", zap.Error(err))
+		utilErrs.SendInternalError(w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

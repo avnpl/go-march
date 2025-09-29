@@ -1,12 +1,15 @@
 package utils
 
 import (
+	"encoding/json"
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"log"
+	"net/http"
 	"os"
+	"strings"
 )
 
 func getEnvVar(key string) string {
@@ -53,4 +56,23 @@ func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
 		logger.Fatal("db connect failed", zap.Error(err))
 	}
 	return db
+}
+
+func SendJSONError(w http.ResponseWriter, statusCode int, message string) {
+	apiErr := APIError{
+		Error:   http.StatusText(statusCode),
+		Message: message,
+	}
+
+	if strings.TrimSpace(apiErr.Message) == "" {
+		apiErr.Message = "Something went wrong"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(apiErr)
+}
+
+func SendInternalError(w http.ResponseWriter) {
+	SendJSONError(w, http.StatusInternalServerError, "")
 }
