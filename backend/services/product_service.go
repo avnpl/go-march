@@ -34,7 +34,7 @@ func (s *productService) CreateProduct(ctx context.Context, req *models.CreatePr
 		Stock: req.Stock,
 	}
 
-	res, err := s.repo.Create(ctx, p)
+	res, err := s.repo.Create(ctx, &p)
 	if err != nil {
 		return models.Product{}, fmt.Errorf("service create: %w", err)
 	}

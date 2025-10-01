@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
@@ -37,7 +38,7 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	reqString := string(bodyBytes)
 	h.log.Debug("raw body",
 		zap.Int("length", len(bodyBytes)),
-		zap.String("body", reqString),
+		zap.String("body", strings.ReplaceAll(reqString, " ", "")),
 	)
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
@@ -100,7 +101,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	reqString := string(bodyBytes)
 	h.log.Debug("raw body",
 		zap.Int("length", len(bodyBytes)),
-		zap.String("body", reqString),
+		zap.String("body", strings.ReplaceAll(reqString, " ", "")),
 	)
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 

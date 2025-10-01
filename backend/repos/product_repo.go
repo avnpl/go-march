@@ -12,7 +12,7 @@ import (
 )
 
 type ProductRepo interface {
-	Create(ctx context.Context, p models.Product) (models.Product, error)
+	Create(ctx context.Context, p *models.Product) (models.Product, error)
 	FetchByID(ctx context.Context, id int64) (models.Product, error)
 	UpdateByID(ctx *context.Context, id int64, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id int64) (models.Product, error)
@@ -26,7 +26,7 @@ func NewPGProductRepo(db *sqlx.DB) ProductRepo {
 	return pgProductRepo{db: db}
 }
 
-func (r pgProductRepo) Create(ctx context.Context, p models.Product) (models.Product, error) {
+func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
 	const query = "INSERT INTO products (prod_name, price, stock) VALUES ($1, $2, $3) RETURNING *"
 
 	var res models.Product
