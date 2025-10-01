@@ -88,6 +88,18 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(prod)
 }
 
+func (h ProductHandler) FetchAllProducts(w http.ResponseWriter, r *http.Request) {
+	prods, err := h.svc.GetAllProducts(r.Context())
+	if err != nil {
+		h.log.Error(fmt.Errorf("FetchAllProducts failed").Error())
+		utilErrs.SendInternalError(w)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(prods)
+}
+
 func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {

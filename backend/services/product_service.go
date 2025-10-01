@@ -12,6 +12,7 @@ import (
 type ProductService interface {
 	CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error)
 	GetProductByID(ctx context.Context, id int64) (models.Product, error)
+	GetAllProducts(ctx context.Context) ([]models.Product, error)
 	UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error)
 	DeleteProduct(ctx context.Context, id int64) (models.Product, error)
 }
@@ -34,7 +35,7 @@ func (s *productService) CreateProduct(ctx context.Context, req *models.CreatePr
 
 	res, err := s.repo.Create(ctx, &p)
 	if err != nil {
-		return models.Product{}, fmt.Errorf("service create: %w", err)
+		return models.Product{}, fmt.Errorf("product_service.Create: %w", err)
 	}
 
 	s.log.Info("created product", zap.String("prod_id", p.ProductID))
@@ -45,16 +46,24 @@ func (s *productService) GetProductByID(ctx context.Context, id int64) (models.P
 	var res models.Product
 	res, err := s.repo.FetchByID(ctx, id)
 	if err != nil {
-		return res, fmt.Errorf("fetch products: %w", err)
+		return res, fmt.Errorf("product_service.Get: %w", err)
 	}
 
+	return res, nil
+}
+
+func (s *productService) GetAllProducts(ctx context.Context) ([]models.Product, error) {
+	res, err := s.repo.FetchAllProducts(ctx)
+	if err != nil {
+		return res, fmt.Errorf("product_service.GetAll: %w", err)
+	}
 	return res, nil
 }
 
 func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error) {
 	res, err := s.repo.UpdateByID(&ctx, req)
 	if err != nil {
-		return models.Product{}, fmt.Errorf("service update: %w", err)
+		return models.Product{}, fmt.Errorf("product_service.Update: %w", err)
 	}
 	s.log.Info("updated product", zap.String("prod_id", res.ProductID))
 	return res, nil
@@ -63,7 +72,7 @@ func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdatePr
 func (s *productService) DeleteProduct(ctx context.Context, id int64) (models.Product, error) {
 	res, err := s.repo.DeleteByID(ctx, id)
 	if err != nil {
-		return models.Product{}, fmt.Errorf("service delete : %w", err)
+		return models.Product{}, fmt.Errorf("prod_service.Delete: %w", err)
 	}
 
 	s.log.Info("deleted product", zap.String("prod_id", res.ProductID))

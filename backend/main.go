@@ -42,6 +42,13 @@ func main() {
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
 	})
+	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.FetchAllProducts(w, r)
+		} else {
+			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
+		}
+	})
 	mux.HandleFunc("/product/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete:
