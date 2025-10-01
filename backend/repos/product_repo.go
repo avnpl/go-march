@@ -2,10 +2,9 @@ package repos
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
-
-	utilErrs "github.com/avnpl/go-march/utils"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/jmoiron/sqlx"
@@ -14,7 +13,7 @@ import (
 type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) (models.Product, error)
 	FetchByID(ctx context.Context, id int64) (models.Product, error)
-	UpdateByID(ctx *context.Context, id int64, p *models.UpdateProductReq) (models.Product, error)
+	UpdateByID(ctx *context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id int64) (models.Product, error)
 }
 
@@ -31,7 +30,7 @@ func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Pr
 
 	var res models.Product
 	if err := r.db.GetContext(ctx, &res, query, p.Name, p.Price, p.Stock); err != nil {
-		return models.Product{}, fmt.Errorf("repo.Create: %w", err)
+		return models.Product{}, fmt.Errorf("product_repo.Create: %w", err)
 	}
 	return res, nil
 }
@@ -42,12 +41,12 @@ func (r pgProductRepo) FetchByID(ctx context.Context, id int64) (models.Product,
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
 	if err != nil {
-		return result, fmt.Errorf("repo.FetchByID: %w", err)
+		return result, fmt.Errorf("product_repo.FetchByID: %w", err)
 	}
 	return result, nil
 }
 
-func (r pgProductRepo) UpdateByID(ctx *context.Context, id int64, p *models.UpdateProductReq) (models.Product, error) {
+func (r pgProductRepo) UpdateByID(ctx *context.Context, p *models.UpdateProductReq) (models.Product, error) {
 	query := "UPDATE products SET "
 	args := make(map[string]interface{})
 	var fieldsToUpdate []string
@@ -75,19 +74,16 @@ func (r pgProductRepo) UpdateByID(ctx *context.Context, id int64, p *models.Upda
 
 	result, err := r.db.NamedQueryContext(*ctx, query, args)
 	if err != nil {
-		if strings.Contains(err.Error(), "unique") {
-			return models.Product{}, fmt.Errorf("repo.Update conflict: %w", err)
-		}
-		return models.Product{}, fmt.Errorf("repo.Update: %w", err)
+		return models.Product{}, fmt.Errorf("product_repo.Update: %w", err)
 	}
 
 	if result.Next() {
 		err := result.StructScan(&res)
 		if err != nil {
-			return models.Product{}, fmt.Errorf("repo.Update: %w", err)
+			return models.Product{}, fmt.Errorf("product_repo.Update: %w", err)
 		}
 	} else {
-		return models.Product{}, fmt.Errorf("repo.Update: %w", utilErrs.ErrRecordNotFound)
+		return models.Product{}, fmt.Errorf("product_repo.Update: %w", sql.ErrNoRows)
 	}
 
 	return res, nil
@@ -99,7 +95,7 @@ func (r pgProductRepo) DeleteByID(ctx context.Context, id int64) (models.Product
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
 	if err != nil {
-		return result, fmt.Errorf("repo.FetchByID: %w", err)
+		return result, fmt.Errorf("product_repo.DeleteByID: %w", err)
 	}
 	return result, nil
 }

@@ -29,9 +29,8 @@ func NewProductHandler(svc services.ProductService, log *zap.Logger) ProductHand
 func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(),
-			zap.Error(err))
-		utilErrs.SendInternalError(w)
+		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(), zap.Error(err))
+		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
@@ -50,12 +49,12 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	prod, err := h.svc.CreateProduct(r.Context(), &req)
 	if err != nil {
-		if errors.Is(err, utilErrs.ErrConflict) {
+		h.log.Error("CreateProduct failed", zap.Error(err))
+		if errors.As(err, &utilErrs.ErrConflict) {
 			utilErrs.SendJSONError(w, http.StatusConflict, "")
 			return
 		}
 		utilErrs.SendInternalError(w)
-		h.log.Error("CreateProduct failed", zap.Error(err))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -92,8 +91,7 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(),
-			zap.Error(err))
+		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(), zap.Error(err))
 		utilErrs.SendInternalError(w)
 		return
 	}
@@ -112,7 +110,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prod, err := h.svc.UpdateProduct(r.Context(), *req.ProductID, &req)
+	prod, err := h.svc.UpdateProduct(r.Context(), &req)
 	if err != nil {
 		if errors.Is(err, utilErrs.ErrConflict) {
 			http.Error(w, err.Error(), http.StatusConflict)

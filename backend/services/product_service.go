@@ -12,7 +12,7 @@ import (
 type ProductService interface {
 	CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error)
 	GetProductByID(ctx context.Context, id int64) (models.Product, error)
-	UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (models.Product, error)
+	UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error)
 	DeleteProduct(ctx context.Context, id int64) (models.Product, error)
 }
 
@@ -26,8 +26,6 @@ func NewProductService(r repos.ProductRepo, l *zap.Logger) ProductService {
 }
 
 func (s *productService) CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error) {
-	// TODO Validate request
-
 	p := models.Product{
 		Name:  req.Name,
 		Price: req.Price,
@@ -53,8 +51,8 @@ func (s *productService) GetProductByID(ctx context.Context, id int64) (models.P
 	return res, nil
 }
 
-func (s *productService) UpdateProduct(ctx context.Context, id int64, req *models.UpdateProductReq) (models.Product, error) {
-	res, err := s.repo.UpdateByID(&ctx, id, req)
+func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error) {
+	res, err := s.repo.UpdateByID(&ctx, req)
 	if err != nil {
 		return models.Product{}, fmt.Errorf("service update: %w", err)
 	}

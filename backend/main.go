@@ -39,8 +39,7 @@ func main() {
 		case http.MethodPost:
 			h.CreateProduct(w, r)
 		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
+			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
 	})
 	mux.HandleFunc("/product/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -50,8 +49,7 @@ func main() {
 		case http.MethodGet:
 			h.FetchProduct(w, r)
 		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
+			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
 	})
 
