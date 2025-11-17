@@ -23,6 +23,11 @@ func getEnvVar(key string) string {
 func BuildLogger() *zap.Logger {
 	loggerConfig := zap.NewDevelopmentConfig()
 
+	err := os.MkdirAll("logs", 0755)
+	if err != nil {
+		log.Fatalf("Failed to create log directory: %v", err)
+	}
+
 	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	loggerConfig.Development = true
 	loggerConfig.EncoderConfig.TimeKey = "ts"
@@ -37,7 +42,7 @@ func BuildLogger() *zap.Logger {
 	loggerConfig.ErrorOutputPaths = []string{"stderr", "logs/app.log"}
 	loggerConfig.DisableStacktrace = false
 
-	var logger, err = loggerConfig.Build(
+	logger, err := loggerConfig.Build(
 		zap.AddStacktrace(zap.ErrorLevel),
 	)
 	if err != nil {
