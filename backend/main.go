@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/avnpl/go-march/api/rest"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/avnpl/go-march/handlers"
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/services"
 	"github.com/avnpl/go-march/utils"
@@ -28,7 +28,7 @@ func main() {
 	// Initialize the layers
 	repo := repos.NewPGProductRepo(db)
 	svc := services.NewProductService(repo, logger)
-	h := handlers.NewProductHandler(svc, logger)
+	h := rest.NewProductHandler(svc, logger)
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
