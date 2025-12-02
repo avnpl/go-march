@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	gql "github.com/avnpl/go-march/api/graphql"
 	"github.com/avnpl/go-march/api/rest"
+	"github.com/graphql-go/graphql"
 	"net/http"
 	"os"
 	"os/signal"
@@ -58,6 +61,20 @@ func main() {
 		default:
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
+	})
+
+	http.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
+		var params struct {
+			Query string `json:"query"`
+		}
+		json.NewDecoder(r.Body).Decode(&params)
+
+		result := graphql.Do(graphql.Params{
+			Schema:        gql.Schema,
+			RequestString: params.Query,
+		})
+
+		json.NewEncoder(w).Encode(result)
 	})
 
 	srv := &http.Server{
