@@ -63,7 +63,7 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
 		var params struct {
 			Query string `json:"query"`
 		}
@@ -74,7 +74,9 @@ func main() {
 			RequestString: params.Query,
 		})
 
-		json.NewEncoder(w).Encode(result)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(result)
 	})
 
 	srv := &http.Server{
