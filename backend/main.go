@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	gql "github.com/avnpl/go-march/api/graphql"
-	"github.com/avnpl/go-march/api/rest"
-	"github.com/graphql-go/graphql"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	gql "github.com/avnpl/go-march/api/graphql"
+	"github.com/avnpl/go-march/api/rest"
+	"github.com/graphql-go/graphql"
 
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/services"
@@ -63,6 +64,10 @@ func main() {
 		}
 	})
 
+	if err := gql.NewSchema(svc); err != nil {
+		logger.Fatal("failed to instantiate GraphQL Schema", zap.Error(err))
+	}
+
 	mux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
 		var params struct {
 			Query string `json:"query"`
@@ -72,6 +77,7 @@ func main() {
 		result := graphql.Do(graphql.Params{
 			Schema:        gql.Schema,
 			RequestString: params.Query,
+			Context:       r.Context(),
 		})
 
 		w.Header().Set("Content-Type", "application/json")
