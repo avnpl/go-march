@@ -19,15 +19,15 @@ func NewSchema(productService services.ProductService) error {
 		Fields: GetQueryFields(resolver),
 	})
 
-	// MutationType = graphql.NewObject(graphql.ObjectConfig{
-	// 	Name:   "Mutation",
-	// 	Fields: GetMutationFields(resolver),
-	// })
+	MutationType = graphql.NewObject(graphql.ObjectConfig{
+		Name:   "Mutation",
+		Fields: GetMutationFields(resolver),
+	})
 
 	var err error
 	Schema, err = graphql.NewSchema(graphql.SchemaConfig{
-		Query: QueryType,
-		// Mutation: MutationType,
+		Query:    QueryType,
+		Mutation: MutationType,
 	})
 
 	return err

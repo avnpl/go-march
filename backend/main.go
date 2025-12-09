@@ -69,6 +69,12 @@ func main() {
 	}
 
 	mux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
+
+		if r.Method != http.MethodPost {
+			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
+			return
+		}
+
 		var params struct {
 			Query string `json:"query"`
 		}
