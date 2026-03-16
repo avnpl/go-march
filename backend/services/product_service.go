@@ -53,7 +53,7 @@ func (s *productService) GetProductByID(ctx context.Context, id int64) (models.P
 }
 
 func (s *productService) GetAllProducts(ctx context.Context) ([]models.Product, error) {
-	res, err := s.repo.FetchAllProducts(ctx)
+	res, err := s.repo.FetchAll(ctx)
 	if err != nil {
 		return res, fmt.Errorf("product_service.GetAll: %w", err)
 	}

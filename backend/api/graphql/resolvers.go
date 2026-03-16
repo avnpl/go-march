@@ -19,7 +19,7 @@ func NewResolver(productService services.ProductService) *Resolver {
 	}
 }
 
-func (r *Resolver) Product(p graphql.ResolveParams) (interface{}, error) {
+func (r *Resolver) GetProductByID(p graphql.ResolveParams) (interface{}, error) {
 
 	idStr, ok := p.Args["id"].(string)
 	if !ok {
@@ -44,7 +44,7 @@ func (r *Resolver) Product(p graphql.ResolveParams) (interface{}, error) {
 	return product, nil
 }
 
-func (r *Resolver) Products(p graphql.ResolveParams) (interface{}, error) {
+func (r *Resolver) GetAllProducts(p graphql.ResolveParams) (interface{}, error) {
 
 	ctx := p.Context
 	if ctx == nil {

@@ -13,7 +13,7 @@ import (
 type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) (models.Product, error)
 	FetchByID(ctx context.Context, id int64) (models.Product, error)
-	FetchAllProducts(ctx context.Context) ([]models.Product, error)
+	FetchAll(ctx context.Context) ([]models.Product, error)
 	UpdateByID(ctx *context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id int64) (models.Product, error)
 }
@@ -47,7 +47,7 @@ func (r pgProductRepo) FetchByID(ctx context.Context, id int64) (models.Product,
 	return result, nil
 }
 
-func (r pgProductRepo) FetchAllProducts(ctx context.Context) ([]models.Product, error) {
+func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
 	const query = "SELECT * FROM PRODUCTS"
 
 	var result []models.Product

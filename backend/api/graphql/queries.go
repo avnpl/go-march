@@ -6,7 +6,7 @@ import (
 
 func GetQueryFields(resolver *Resolver) graphql.Fields {
 	return graphql.Fields{
-		"product": &graphql.Field{
+		"getProductByID": &graphql.Field{
 			Type: ProductType,
 			Args: graphql.FieldConfigArgument{
 				"id": &graphql.ArgumentConfig{
@@ -14,12 +14,12 @@ func GetQueryFields(resolver *Resolver) graphql.Fields {
 					Description: "The ID of the product to fetch",
 				},
 			},
-			Resolve:     resolver.Product,
+			Resolve:     resolver.GetProductByID,
 			Description: "Fetch a single product by ID",
 		},
-		"products": &graphql.Field{
+		"getAllProducts": &graphql.Field{
 			Type:        graphql.NewList(ProductType),
-			Resolve:     resolver.Products,
+			Resolve:     resolver.GetAllProducts,
 			Description: "Fetch all products",
 		},
 	}

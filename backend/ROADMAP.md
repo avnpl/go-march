@@ -1,7 +1,7 @@
 # Go March Backend — Development Roadmap
 
 > **Context:** See [`CLAUDE.md`](./CLAUDE.md) for project conventions, architecture, and tech stack.
-> **Code Review:** See [`reviews/2026-03-12.md`](./reviews/2026-03-12.md) for the full issue breakdown with code snippets and explanations.
+> **Code Review:** See [`agent-reviews/2026-03-12.md`](./agent-reviews/2026-03-12.md) for the full issue breakdown with code snippets and explanations.
 
 ---
 

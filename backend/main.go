@@ -30,25 +30,25 @@ func main() {
 	defer db.Close()
 
 	// Initialize the layers
-	repo := repos.NewPGProductRepo(db)
-	svc := services.NewProductService(repo, logger)
-	h := rest.NewProductHandler(svc, logger)
+	productRepo := repos.NewPGProductRepo(db)
+	productService := services.NewProductService(productRepo, logger)
+	productHandler := rest.NewProductHandler(productService, logger)
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
 	mux.HandleFunc("/product", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPatch:
-			h.UpdateProduct(w, r)
+			productHandler.UpdateProduct(w, r)
 		case http.MethodPost:
-			h.CreateProduct(w, r)
+			productHandler.CreateProduct(w, r)
 		default:
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
 	})
 	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			h.FetchAllProducts(w, r)
+			productHandler.FetchAllProducts(w, r)
 		} else {
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
@@ -56,15 +56,15 @@ func main() {
 	mux.HandleFunc("/product/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete:
-			h.DeleteProduct(w, r)
+			productHandler.DeleteProduct(w, r)
 		case http.MethodGet:
-			h.FetchProduct(w, r)
+			productHandler.FetchProduct(w, r)
 		default:
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
 	})
 
-	if err := gql.NewSchema(svc); err != nil {
+	if err := gql.NewSchema(productService); err != nil {
 		logger.Fatal("failed to instantiate GraphQL Schema", zap.Error(err))
 	}
 
