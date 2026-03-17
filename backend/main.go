@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -9,7 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/avnpl/go-march/handlers"
+	gql "github.com/avnpl/go-march/api/graphql"
+	"github.com/avnpl/go-march/api/rest"
+	"github.com/graphql-go/graphql"
+
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/services"
 	"github.com/avnpl/go-march/utils"
@@ -26,25 +30,25 @@ func main() {
 	defer db.Close()
 
 	// Initialize the layers
-	repo := repos.NewPGProductRepo(db)
-	svc := services.NewProductService(repo, logger)
-	h := handlers.NewProductHandler(svc, logger)
+	productRepo := repos.NewPGProductRepo(db)
+	productService := services.NewProductService(productRepo, logger)
+	productHandler := rest.NewProductHandler(productService, logger)
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
 	mux.HandleFunc("/product", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPatch:
-			h.UpdateProduct(w, r)
+			productHandler.UpdateProduct(w, r)
 		case http.MethodPost:
-			h.CreateProduct(w, r)
+			productHandler.CreateProduct(w, r)
 		default:
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
 	})
 	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			h.FetchAllProducts(w, r)
+			productHandler.FetchAllProducts(w, r)
 		} else {
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
@@ -52,12 +56,39 @@ func main() {
 	mux.HandleFunc("/product/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete:
-			h.DeleteProduct(w, r)
+			productHandler.DeleteProduct(w, r)
 		case http.MethodGet:
-			h.FetchProduct(w, r)
+			productHandler.FetchProduct(w, r)
 		default:
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
+	})
+
+	if err := gql.NewSchema(productService); err != nil {
+		logger.Fatal("failed to instantiate GraphQL Schema", zap.Error(err))
+	}
+
+	mux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
+
+		if r.Method != http.MethodPost {
+			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
+			return
+		}
+
+		var params struct {
+			Query string `json:"query"`
+		}
+		json.NewDecoder(r.Body).Decode(&params)
+
+		result := graphql.Do(graphql.Params{
+			Schema:        gql.Schema,
+			RequestString: params.Query,
+			Context:       r.Context(),
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(result)
 	})
 
 	srv := &http.Server{

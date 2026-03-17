@@ -1,7 +1,7 @@
 # Go March Backend — Development Roadmap
 
 > **Context:** See [`CLAUDE.md`](./CLAUDE.md) for project conventions, architecture, and tech stack.
-> **Code Review:** See [`reviews/2026-03-12.md`](./reviews/2026-03-12.md) for the full issue breakdown with code snippets and explanations.
+> **Code Review:** See [`agent-reviews/2026-03-12.md`](./agent-reviews/2026-03-12.md) for the full issue breakdown with code snippets and explanations.
 
 ---
 
@@ -205,9 +205,9 @@ Replace `fmt.Errorf(...).Error()` with plain string messages across all 6 locati
 
 ### 3.1 Complete Product Mutations
 
-- [ ] Add `createProduct` mutation in `api/graphql/mutations.go` + input type in `types.go`
-- [ ] Add `deleteProduct` mutation (takes ID, returns deleted product)
-- [ ] Implement resolvers in `resolvers.go`
+- [x] Add `createProduct` mutation in `api/graphql/mutations.go` + input type in `types.go`
+- [x] Add `deleteProduct` mutation (takes ID, returns deleted product)
+- [x] Implement resolvers in `resolvers.go`
 
 ### 3.2 Order GraphQL Types
 
