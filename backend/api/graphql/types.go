@@ -37,3 +37,13 @@ var UpdateProductInput = graphql.NewInputObject(graphql.InputObjectConfig{
 		},
 	},
 })
+
+var DeleteProductInput = graphql.NewInputObject(graphql.InputObjectConfig{
+	Name: "DeleteProductInput",
+	Fields: graphql.InputObjectConfigFieldMap{
+		"prod_id": &graphql.InputObjectFieldConfig{
+			Type:        graphql.String,
+			Description: "The ID of the product to be deleted",
+		},
+	},
+})

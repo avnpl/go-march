@@ -108,3 +108,40 @@ func (r *Resolver) UpdateProduct(p graphql.ResolveParams) (interface{}, error) {
 
 	return product, nil
 }
+
+func (r *Resolver) DeleteProduct(p graphql.ResolveParams) (interface{}, error) {
+
+	ctx := p.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	input, ok := p.Args["input"].(map[string]interface{})
+	if !ok {
+		return nil, nil
+	}
+
+	prodIDRaw, ok := input["prod_id"]
+	if !ok {
+		return nil, nil
+	}
+
+	var productID int64
+	switch v := prodIDRaw.(type) {
+	case int:
+		productID = int64(v)
+	case int64:
+		productID = v
+	case string:
+		productID, _ = strconv.ParseInt(prodIDRaw.(string), 10, 64)
+	default:
+		return nil, nil
+	}
+
+	product, err := r.productService.DeleteProduct(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+
+	return product, nil
+}
