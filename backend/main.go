@@ -78,7 +78,16 @@ func main() {
 		var params struct {
 			Query string `json:"query"`
 		}
-		json.NewDecoder(r.Body).Decode(&params)
+		err := json.NewDecoder(r.Body).Decode(&params)
+		if err != nil {
+			utils.SendJSONError(w, http.StatusBadRequest, "Invalid Request")
+			return
+		}
+
+		if params.Query == "" {
+			utils.SendJSONError(w, http.StatusBadRequest, "Query cannot be empty")
+			return
+		}
 
 		result := graphql.Do(graphql.Params{
 			Schema:        gql.Schema,

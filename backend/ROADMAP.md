@@ -28,39 +28,39 @@ These are correctness and safety bugs. Fix them before any feature work.
 
 ### 0.1 Fix `errors.As` → `errors.Is` (Review #13)
 
-- [ ] `api/rest/product_handler.go:53` — change `errors.As(err, &utilErrs.ErrConflict)` to `errors.Is(err, utilErrs.ErrConflict)`
-- [ ] `api/rest/product_handler.go:79` — change `errors.As(err, &sql.ErrNoRows)` to `errors.Is(err, sql.ErrNoRows)`
-- [ ] `api/rest/product_handler.go:153` — same as above
+- [x] `api/rest/product_handler.go:53` — change `errors.As(err, &utilErrs.ErrConflict)` to `errors.Is(err, utilErrs.ErrConflict)`
+- [x] `api/rest/product_handler.go:79` — change `errors.As(err, &sql.ErrNoRows)` to `errors.Is(err, sql.ErrNoRows)`
+- [x] `api/rest/product_handler.go:153` — same as above
 - **Why first:** These comparisons may silently fail, causing wrong HTTP responses for real errors.
 
 ### 0.2 Add Missing ParseInt Error Check (Review #3)
 
-- [ ] `api/rest/product_handler.go:75-76` — add `if err != nil` check after `strconv.ParseInt` in `FetchProduct`
-- [ ] `api/rest/product_handler.go:150-151` — same fix in `DeleteProduct`
+- [x] `api/rest/product_handler.go:75-76` — add `if err != nil` check after `strconv.ParseInt` in `FetchProduct`
+- [x] `api/rest/product_handler.go:150-151` — same fix in `DeleteProduct`
 - **Why:** Without the check, invalid IDs (e.g., "abc") silently become `0` and hit the database.
 
 ### 0.3 Close `*sqlx.Rows` in UpdateByID (Review #14)
 
-- [ ] `repos/product_repo.go:87` — add `defer result.Close()` after the `NamedQueryContext` nil-error check
+- [x] `repos/product_repo.go:87` — add `defer result.Close()` after the `NamedQueryContext` nil-error check
 - **Why:** Unclosed Rows leak database connections. Under load the pool exhausts and the app hangs.
 
 ### 0.4 Fix Context Pointer Anti-Pattern (Review #1)
 
-- [ ] `repos/product_repo.go:17` — interface: change `UpdateByID(ctx *context.Context, ...)` to `UpdateByID(ctx context.Context, ...)`
-- [ ] `repos/product_repo.go:61` — implementation: same signature change, use `ctx` directly instead of `*ctx`
-- [ ] `services/product_service.go:64` — call site: change `s.repo.UpdateByID(&ctx, req)` to `s.repo.UpdateByID(ctx, req)`
+- [x] `repos/product_repo.go:17` — interface: change `UpdateByID(ctx *context.Context, ...)` to `UpdateByID(ctx context.Context, ...)`
+- [x] `repos/product_repo.go:61` — implementation: same signature change, use `ctx` directly instead of `*ctx`
+- [x] `services/product_service.go:64` — call site: change `s.repo.UpdateByID(&ctx, req)` to `s.repo.UpdateByID(ctx, req)`
 
 ### 0.5 Handle GraphQL JSON Decode Error (Review #2)
 
-- [ ] `main.go:81` — check the return value of `json.NewDecoder(r.Body).Decode(&params)`
-- [ ] Return `400 Bad Request` on decode failure
-- [ ] Return `400 Bad Request` if `params.Query` is empty
+- [x] `main.go:81` — check the return value of `json.NewDecoder(r.Body).Decode(&params)`
+- [x] Return `400 Bad Request` on decode failure
+- [x] Return `400 Bad Request` if `params.Query` is empty
 
 ### 0.6 Replace `pkg/errors` with Standard Library (Review #15)
 
-- [ ] `utils/errors.go` — change import from `"github.com/pkg/errors"` to `"errors"`
-- [ ] Remove `github.com/pkg/errors` from `go.mod` / `go.sum`
-- [ ] Run `go mod tidy`
+- [x] `utils/errors.go` — change import from `"github.com/pkg/errors"` to `"errors"`
+- [x] Remove `github.com/pkg/errors` from `go.mod` / `go.sum`
+- [x] Run `go mod tidy`
 
 ---
 
@@ -205,7 +205,7 @@ Replace `fmt.Errorf(...).Error()` with plain string messages across all 6 locati
 
 ### 3.1 Complete Product Mutations
 
-- [x] Add `createProduct` mutation in `api/graphql/mutations.go` + input type in `types.go`
+- [ ] Add `createProduct` mutation in `api/graphql/mutations.go` + input type in `types.go`
 - [x] Add `deleteProduct` mutation (takes ID, returns deleted product)
 - [x] Implement resolvers in `resolvers.go`
 
@@ -331,6 +331,7 @@ Purpose: real-time streaming of new orders and analytics.
 
 - [ ] Unit tests for services (mock repos via interfaces)
 - [ ] Unit tests for handlers (mock services via interfaces)
+- [ ] **Define handler interfaces for testability (Review #16)** — create `ProductHandlerInterface`, `OrderHandlerInterface` to enable mocking
 - [ ] Table-driven test style
 - [ ] `go test -cover ./...` — aim for meaningful coverage on service logic
 

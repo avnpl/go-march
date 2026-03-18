@@ -50,7 +50,7 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	prod, err := h.svc.CreateProduct(r.Context(), &req)
 	if err != nil {
 		h.log.Error("CreateProduct failed", zap.Error(err))
-		if errors.As(err, &utilErrs.ErrConflict) {
+		if errors.Is(err, utilErrs.ErrConflict) {
 			utilErrs.SendJSONError(w, http.StatusConflict, "")
 			return
 		}
@@ -73,10 +73,15 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	h.log.Debug("received ID => ", zap.String("request param", idStr))
 
 	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		h.log.Error("FetchProduct failed", zap.Error(err))
+		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid ID format")
+		return
+	}
 	prod, err := h.svc.GetProductByID(r.Context(), id)
 	if err != nil {
 		h.log.Error("GetProductByID failed", zap.Error(err))
-		if errors.As(err, &sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			utilErrs.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")
 			return
 		}
@@ -148,9 +153,14 @@ func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	h.log.Debug("received ID => ", zap.String("request param", idStr))
 
 	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		h.log.Error("DeleteProduct failed", zap.Error(err))
+		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid ID format")
+		return
+	}
 	prod, err := h.svc.DeleteProduct(r.Context(), id)
 	if err != nil {
-		if errors.As(err, &sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			utilErrs.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")
 			return
 		}

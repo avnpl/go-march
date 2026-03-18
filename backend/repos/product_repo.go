@@ -14,7 +14,7 @@ type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) (models.Product, error)
 	FetchByID(ctx context.Context, id int64) (models.Product, error)
 	FetchAll(ctx context.Context) ([]models.Product, error)
-	UpdateByID(ctx *context.Context, p *models.UpdateProductReq) (models.Product, error)
+	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id int64) (models.Product, error)
 }
 
@@ -58,7 +58,7 @@ func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
 	return result, nil
 }
 
-func (r pgProductRepo) UpdateByID(ctx *context.Context, p *models.UpdateProductReq) (models.Product, error) {
+func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error) {
 	query := "UPDATE products SET "
 	args := make(map[string]interface{})
 	var fieldsToUpdate []string
@@ -84,10 +84,11 @@ func (r pgProductRepo) UpdateByID(ctx *context.Context, p *models.UpdateProductR
 	query += " WHERE prod_id = :prod_id RETURNING *"
 	args["prod_id"] = p.ProductID
 
-	result, err := r.db.NamedQueryContext(*ctx, query, args)
+	result, err := r.db.NamedQueryContext(ctx, query, args)
 	if err != nil {
 		return models.Product{}, fmt.Errorf("product_repo.Update: %w", err)
 	}
+	defer result.Close()
 
 	if result.Next() {
 		err := result.StructScan(&res)
