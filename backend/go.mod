@@ -3,16 +3,14 @@ module github.com/avnpl/go-march
 go 1.23.2
 
 require (
+	github.com/graphql-go/graphql v0.8.1
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
-	github.com/pkg/errors v0.8.1
 	go.uber.org/zap v1.13.0
 )
 
 require (
-	github.com/graphql-go/graphql v0.8.1 // indirect
-	github.com/graphql-go/handler v0.2.4 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect

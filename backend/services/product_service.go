@@ -61,7 +61,7 @@ func (s *productService) GetAllProducts(ctx context.Context) ([]models.Product, 
 }
 
 func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error) {
-	res, err := s.repo.UpdateByID(&ctx, req)
+	res, err := s.repo.UpdateByID(ctx, req)
 	if err != nil {
 		return models.Product{}, fmt.Errorf("product_service.Update: %w", err)
 	}
