@@ -1,379 +1,448 @@
 # Go March Backend — Development Roadmap
 
-> **Context:** See [`CLAUDE.md`](./CLAUDE.md) for project conventions, architecture, and tech stack.
-> **Code Review:** See [`agent-reviews/2026-03-12.md`](./agent-reviews/2026-03-12.md) for the full issue breakdown with code snippets and explanations.
+> **Concept**: A JSONPlaceholder-style learning API demonstrating 5 different API styles in Go. Users can test and learn REST, GraphQL, SOAP, gRPC, and WebSocket by interacting with a simple inventory/order system.
+>
+> **Architecture**: Layered design (handlers → services → repos) where service and repo layers are API-agnostic. All API styles share the same business logic.
 
 ---
 
 ## Strategy
 
-Fix critical bugs first, then harden the foundation, then build features layer by layer. Each phase is completed and reviewed before the next begins.
+Each API style demonstrates its strengths. No duplication of CRUD across APIs.
 
 ```
-Phase 0  Critical Fixes ──────────── stop the bleeding
-Phase 1  Foundation Hardening ─────── models, utils, error handling, DB
-Phase 2  REST Completion ──────────── order endpoints + polish
-Phase 3  GraphQL Completion ───────── missing mutations + order ops
-Phase 4  SOAP API ─────────────────── transactional order placement
-Phase 5  gRPC API ─────────────────── analytics procedures
-Phase 6  WebSocket API ────────────── real-time streaming
-Phase 7  Final Integration ────────── refactor, test, document
+Phase 1   REST Completion ────────────── complete end-to-end flow
+Phase 2   GraphQL Enhancement ─────────── orders + nested products
+Phase 3   SOAP Implementation ────────── payment transactions
+Phase 4   gRPC Analytics ──────────────── high-perf aggregations
+Phase 5   WebSocket Real-time ──────────── notifications
+Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 ```
 
 ---
 
-## Phase 0: Critical Bug Fixes
+## Data Models
 
-These are correctness and safety bugs. Fix them before any feature work.
+### Product
+- `prod_id` (int64)
+- `prod_name` (string)
+- `price` (float64)
+- `stock` (int)
+- `created_at` (timestamp)
+- `updated_at` (timestamp)
+- `ttl_expires_at` (timestamp) — for auto-cleanup
 
-### 0.1 Fix `errors.As` → `errors.Is` (Review #13)
+### Order
+- `order_id` (int64)
+- `product_id` (int64, FK)
+- `quantity` (int)
+- `total_price` (float64)
+- `status` (string: "pending", "paid", "failed")
+- `shipping_address` (string) — updatable
+- `notes` (string) — updatable
+- `created_at` (timestamp)
+- `ttl_expires_at` (timestamp)
 
-- [x] `api/rest/product_handler.go:53` — change `errors.As(err, &utilErrs.ErrConflict)` to `errors.Is(err, utilErrs.ErrConflict)`
-- [x] `api/rest/product_handler.go:79` — change `errors.As(err, &sql.ErrNoRows)` to `errors.Is(err, sql.ErrNoRows)`
-- [x] `api/rest/product_handler.go:153` — same as above
-- **Why first:** These comparisons may silently fail, causing wrong HTTP responses for real errors.
-
-### 0.2 Add Missing ParseInt Error Check (Review #3)
-
-- [x] `api/rest/product_handler.go:75-76` — add `if err != nil` check after `strconv.ParseInt` in `FetchProduct`
-- [x] `api/rest/product_handler.go:150-151` — same fix in `DeleteProduct`
-- **Why:** Without the check, invalid IDs (e.g., "abc") silently become `0` and hit the database.
-
-### 0.3 Close `*sqlx.Rows` in UpdateByID (Review #14)
-
-- [x] `repos/product_repo.go:87` — add `defer result.Close()` after the `NamedQueryContext` nil-error check
-- **Why:** Unclosed Rows leak database connections. Under load the pool exhausts and the app hangs.
-
-### 0.4 Fix Context Pointer Anti-Pattern (Review #1)
-
-- [x] `repos/product_repo.go:17` — interface: change `UpdateByID(ctx *context.Context, ...)` to `UpdateByID(ctx context.Context, ...)`
-- [x] `repos/product_repo.go:61` — implementation: same signature change, use `ctx` directly instead of `*ctx`
-- [x] `services/product_service.go:64` — call site: change `s.repo.UpdateByID(&ctx, req)` to `s.repo.UpdateByID(ctx, req)`
-
-### 0.5 Handle GraphQL JSON Decode Error (Review #2)
-
-- [x] `main.go:81` — check the return value of `json.NewDecoder(r.Body).Decode(&params)`
-- [x] Return `400 Bad Request` on decode failure
-- [x] Return `400 Bad Request` if `params.Query` is empty
-
-### 0.6 Replace `pkg/errors` with Standard Library (Review #15)
-
-- [x] `utils/errors.go` — change import from `"github.com/pkg/errors"` to `"errors"`
-- [x] Remove `github.com/pkg/errors` from `go.mod` / `go.sum`
-- [x] Run `go mod tidy`
+### Payment
+- `payment_id` (int64)
+- `order_id` (int64, FK)
+- `amount` (float64)
+- `status` (string: "pending", "success", "failed")
+- `card_number` (string) — stored for simulation validation
+- `card_last_four` (string) — last 4 digits
+- `created_at` (timestamp)
+- `ttl_expires_at` (timestamp)
 
 ---
 
-## Phase 1: Foundation Hardening
+## API Style Mapping
 
-Address medium-severity issues and prepare the data layer for order features.
-
-### 1.1 Fix HTTP Status Codes (Review #4)
-
-- [ ] `api/rest/product_handler.go:87` — `FetchProduct`: change `StatusCreated` → `StatusOK`
-- [ ] `api/rest/product_handler.go:136` — `UpdateProduct`: change `StatusCreated` → `StatusOK`
-- [ ] `api/rest/product_handler.go:162` — `DeleteProduct`: change `StatusCreated` → `StatusNoContent`, remove JSON body encoding
-
-### 1.2 Fix Error Logging Pattern (Review #5)
-
-Replace `fmt.Errorf(...).Error()` with plain string messages across all 6 locations:
-- [ ] Line 32 — `CreateProduct` read body
-- [ ] Line 46 — `CreateProduct` decode
-- [ ] Line 68 — `FetchProduct` no ID
-- [ ] Line 94 — `FetchAllProducts` (also add `zap.Error(err)` — currently lost entirely)
-- [ ] Line 106 — `UpdateProduct` read body
-- [ ] Line 120 — `UpdateProduct` decode
-
-### 1.3 Remove Request Body Logging (Review #10 + #11)
-
-- [ ] Remove debug body logging at `api/rest/product_handler.go:37-42` (CreateProduct)
-- [ ] Remove debug body logging at `api/rest/product_handler.go:111-116` (UpdateProduct)
-- [ ] Remove the `"strings"` import (line 12) — becomes unused after the above
-- [ ] Remove the `reqString` variable and `bytes`/`io` body-read-and-rewrite pattern if no longer needed
-
-### 1.4 Fix Model Types (Review #7)
-
-- [ ] `models/models.go` — change `Product.CreatedAt` and `Product.UpdatedAt` from `string` to `time.Time`
-- [ ] `models/models.go` — change `Orders.CreatedAt` from `string` to `time.Time`
-- [ ] `models/models.go` — change `Orders.Amount` from `string` to `float64`
-- [ ] Add JSON tags to all `Orders` fields
-- [ ] Verify `sqlx` scans `time.Time` correctly from CockroachDB timestamps
-
-### 1.5 Implement Input Validation (Review #6)
-
-- [ ] Remove inert `validate:"required"` tags from `CreateProductReq`
-- [ ] Create manual validation functions in `utils/validations.go`:
-  - `ValidateCreateProductReq` — name non-empty, price > 0, stock >= 0
-  - `ValidateUpdateProductReq` — at least one field set
-  - `ValidateCreateOrderReq` — (for Phase 2)
-- [ ] Call validators in handlers before service calls
-- [ ] Return `400 Bad Request` with specific field error messages
-
-### 1.6 Load .env Once at Startup (Review #8)
-
-- [ ] Move `godotenv.Load(".env")` to `main.go` (top of `main()`)
-- [ ] Simplify `getEnvVar` in `utils/utils.go` to just return `os.Getenv(key)`
-- [ ] Handle missing `.env` gracefully (log warning, don't fatal — support system env vars)
-
-### 1.7 Configure DB Connection Pool (Review #9)
-
-- [ ] Add to `GetDBPoolObject` in `utils/utils.go`:
-  - `db.SetMaxOpenConns(25)`
-  - `db.SetMaxIdleConns(10)`
-  - `db.SetConnMaxLifetime(5 * time.Minute)`
-- [ ] Add `db.Ping()` check after connect
-- [ ] Log pool configuration on startup
-
-### 1.8 Normalize SQL Casing (Review #12)
-
-- [ ] `repos/product_repo.go` — standardize all SQL to lowercase:
-  - Line 40: `PRODUCTS` → `products`, `PROD_ID` → `prod_id`
-  - Line 51: `PRODUCTS` → `products`
-  - Line 105: `PROD_ID` → `prod_id`
-- [ ] Extract repeated queries into package-level `const` block
-
-### 1.9 Database Migrations
-
-- [ ] Create `/migrations` directory
-- [ ] `001_create_products.sql` — products table DDL
-- [ ] `002_create_orders.sql` — orders table with FK to products
-- [ ] Naming convention: `NNN_description.up.sql` / `NNN_description.down.sql`
-
-### 1.10 Order Repository
-
-- [ ] Define `OrderRepo` interface in `repos/order_repo.go`:
-  - `Create(ctx context.Context, order *models.Order) (models.Order, error)`
-  - `FetchByID(ctx context.Context, id int64) (models.Order, error)`
-  - `FetchAll(ctx context.Context) ([]models.Order, error)`
-  - `FetchByProductID(ctx context.Context, productID int64) ([]models.Order, error)`
-- [ ] Implement `pgOrderRepo` with `*sqlx.DB`
-- [ ] Use parameterized queries, lowercase SQL, proper error wrapping
-
-### 1.11 Order Service
-
-- [ ] Define `OrderService` interface in `services/order_service.go`:
-  - `PlaceOrder(ctx context.Context, req *models.CreateOrderReq) (models.Order, error)`
-  - `GetOrder(ctx context.Context, id int64) (models.Order, error)`
-  - `GetAllOrders(ctx context.Context) ([]models.Order, error)`
-  - `GetOrdersByProduct(ctx context.Context, productID int64) ([]models.Order, error)`
-- [ ] Implement `orderService` with `OrderRepo` + `ProductRepo` dependencies
-- [ ] `PlaceOrder` business logic: validate product exists, check stock, calculate total, decrement stock
-- [ ] Add `ErrInsufficientStock` sentinel to `utils/errors.go`
+| API | Resources | Purpose | Strength Demonstrated |
+|-----|-----------|---------|----------------------|
+| REST | Products + Orders + Payments | Complete CRUD + full flow | Standard REST patterns |
+| GraphQL | Orders (with nested products) | Filtering + nested queries | Flexible data fetching |
+| SOAP | Payments | Transaction operations | XML contracts |
+| gRPC | Analytics | Aggregations | High-performance streaming |
+| WebSocket | Notifications | Real-time events | Push updates |
 
 ---
 
-### Checkpoint: Foundation Complete
+# Phase 1: REST Completion
 
-- [ ] All 16 review issues resolved
-- [ ] `go vet ./...` passes clean
-- [ ] `go build ./...` succeeds
-- [ ] Order repo + service implemented with consistent patterns
-- [ ] No `*context.Context`, no `pkg/errors`, no unclosed Rows
+## 1.1 Complete Product CRUD
 
----
+**Existing** (needs cleanup):
+- [ ] `POST /products` — create product
+- [ ] `GET /products` — list all products
+- [ ] `GET /products/{id}` — get single product
+- [ ] `PATCH /products/{id}` — update product
+- [ ] `DELETE /products/{id}` — delete product
 
-## Phase 2: REST API Completion
+**Fixes needed** (from prior review):
+- [ ] Fix HTTP status codes (200/201/204)
+- [ ] Remove request body logging
+- [ ] Add proper error handling
+- [ ] Validate inputs (name required, price > 0, stock >= 0)
 
-### 2.1 Order REST Endpoints
+## 1.2 Complete Orders CRUD
 
-- [ ] Create `OrderHandler` in `api/rest/order_handler.go`
-  - Constructor: `NewOrderHandler(svc services.OrderService, log *zap.Logger)`
-  - `CreateOrder` — POST `/order` → 201
-  - `GetOrder` — GET `/order/{id}` → 200
-  - `GetAllOrders` — GET `/orders` → 200
-- [ ] Register routes in `main.go`, wire order repo → service → handler
-- [ ] Apply all conventions from Phase 0/1 fixes (proper status codes, error handling, no body logging)
+**Endpoints**:
+- [ ] `POST /orders` — create order (decrements stock)
+- [ ] `GET /orders` — list all orders
+- [ ] `GET /orders/{id}` — get single order
+- [ ] `PATCH /orders/{id}` — update (address, notes ONLY)
 
-### 2.2 REST Polish
+**Business logic**:
+- [ ] Validate product exists and has sufficient stock
+- [ ] Decrement stock on order creation
+- [ ] Auto-set order status based on payment (handled later)
 
-- [ ] Consistent JSON response envelope across all endpoints (optional)
-- [ ] Verify every handler: decode → validate → service → map error → respond
-- [ ] Ensure `Content-Type: application/json` set on all responses
+## 1.3 Complete Payments API
 
----
+**Endpoints** (no refunds):
+- [ ] `POST /payments` — create payment (simulate authorize)
+- [ ] `GET /payments/{id}` — get payment status
+- [ ] Link payment to order via `order_id`
 
-### Checkpoint: REST Complete
+## Payment simulation
 
-- [ ] Product + Order CRUD fully functional via REST
-- [ ] GET → 200, POST → 201, PATCH → 200, DELETE → 204
-- [ ] Error responses never expose internal details
-- [ ] curl test all endpoints
+- [ ] Payment fails if card number ends in "6969"
+- [ ] All other card numbers succeed (deterministic for testing)
+- [ ] Atomic operation: create payment + set order status in single transaction
+- [ ] Payment status = "success" → Order status = "paid"
+- [ ] Payment status = "failed" → Order status = "failed"
 
----
+## 1.4 Order Update Scope
 
-## Phase 3: GraphQL API Completion
+**Only these fields updatable**:
+- `shipping_address`
+- `notes`
 
-### 3.1 Complete Product Mutations
-
-- [ ] Add `createProduct` mutation in `api/graphql/mutations.go` + input type in `types.go`
-- [x] Add `deleteProduct` mutation (takes ID, returns deleted product)
-- [x] Implement resolvers in `resolvers.go`
-
-### 3.2 Order GraphQL Types
-
-- [ ] Define `OrderType` in `api/graphql/types.go`
-  - Fields: `order_id`, `product_id`, `quantity`, `total_price`, `order_time`
-  - Optional: nested `product` field with resolver
-- [ ] Define `CreateOrderInput` input type
-
-### 3.3 Order Queries and Mutations
-
-- [ ] `order(id: String!)` — single order query
-- [ ] `orders` — all orders query
-- [ ] `ordersByProduct(productId: String!)` — orders by product
-- [ ] `placeOrder(input: CreateOrderInput!)` — mutation
-- [ ] Update `NewSchema` to inject `OrderService`
+**Not updatable** (automatic or admin only):
+- `status` — set by payment flow
+- `delivery_date` — out of scope
 
 ---
 
-### Checkpoint: GraphQL Complete
+# Phase 2: GraphQL Enhancement
 
-- [ ] All product + order operations available via GraphQL
-- [ ] Schema introspection works
-- [ ] Context propagated from HTTP → resolvers → services
+## 2.1 GraphQL Schema
 
----
+**Query**:
+```graphql
+type Query {
+  orders(status: String): [Order!]!
+  order(id: ID!): Order
+}
+```
 
-## Phase 4: SOAP API
+**Mutation**: None (REST handles all mutations)
 
-Purpose: transactional order placement with strict XML contracts.
+**Order Type** (with nested product):
+```graphql
+type Order {
+  order_id: ID!
+  product: Product!
+  quantity: Int!
+  total_price: Float!
+  status: String!
+  shipping_address: String
+  notes: String
+  created_at: String!
+}
 
-### 4.1 SOAP Infrastructure
+type Product {
+  prod_id: ID!
+  prod_name: String!
+  price: Float!
+  stock: Int!
+}
+```
 
-- [ ] Define `SOAPEnvelope`, `SOAPBody`, `SOAPFault` structs with `encoding/xml` tags in `api/soap/`
-- [ ] XML marshal/unmarshal working correctly
+## 2.2 Resolver Implementation
 
-### 4.2 SOAP Order Service
+- [ ] `orders` query with optional status filter
+- [ ] `order` query by ID
+- [ ] Nested `product` resolver in Order type
+- [ ] Use existing `OrderService` from shared layer
 
-- [ ] `PlaceOrderRequest` / `PlaceOrderResponse` types
-- [ ] SOAP handler: parse envelope → extract action → call `OrderService.PlaceOrder` → wrap response
-- [ ] `SOAPFault` for error responses
-- [ ] Register `/soap` endpoint in `main.go`
-- [ ] Content-Type: `text/xml` or `application/soap+xml`
+## 2.3 Integration
 
-### 4.3 WSDL (Optional)
-
-- [ ] Static WSDL file describing the service
-- [ ] Serve at `/soap?wsdl`
-
----
-
-## Phase 5: gRPC API
-
-Purpose: high-performance analytics procedures.
-
-### 5.1 Protocol Buffer Setup
-
-- [ ] Install `protoc`, `protoc-gen-go`, `protoc-gen-go-grpc`
-- [ ] Create `/proto/analytics.proto` — messages + service definition
-- [ ] Generate Go code
-
-### 5.2 Analytics Service
-
-- [ ] Add analytics methods (new `AnalyticsService` or extend `OrderService`):
-  - `GetTotalOrderCount(ctx) (int64, error)`
-  - `GetAverageOrderValue(ctx) (float64, error)`
-  - `GetProductStats(ctx, productID) (stats, error)`
-- [ ] Add aggregate SQL queries to repos
-
-### 5.3 gRPC Server
-
-- [ ] Implement gRPC service in `api/grpc/grpc.go`
-- [ ] Start on separate port (`:50051`)
-- [ ] Graceful shutdown alongside HTTP server
-
-### 5.4 gRPC Streaming (Optional)
-
-- [ ] Server-side streaming RPC for real-time stats
-- [ ] Proper stream close + `context.Done()` handling
+- [ ] Register GraphQL endpoint at `/graphql`
+- [ ] Reuse `OrderService` (API-agnostic — same as REST)
+- [ ] Context propagation: HTTP context → resolver → service
 
 ---
 
-## Phase 6: WebSocket API
+# Phase 3: SOAP Implementation
 
-Purpose: real-time streaming of new orders and analytics.
+## 3.1 SOAP Endpoints
 
-### 6.1 WebSocket Infrastructure
+**Purpose**: Payment transactions with strict XML contracts. Demonstrates enterprise/XML patterns.
 
-- [ ] Create `api/websocket/` package
-- [ ] Choose library: `nhooyr.io/websocket` (context-aware) or `gorilla/websocket`
-- [ ] Upgrader + handler, define JSON message types (`subscribe`, `unsubscribe`, `order_created`, `stats_update`)
+**Operations**:
+- [ ] `PlaceOrder` — create order + process payment atomically
+- [ ] `GetPaymentStatus` — retrieve payment details
 
-### 6.2 Hub Pattern
+## 3.2 XML Schema
 
-- [ ] Connection hub with `clients map`, `broadcast chan`, `register/unregister chan`
-- [ ] `Run()` goroutine managing channels
-- [ ] Per-connection `readPump()` / `writePump()` goroutines
+**SOAP Envelope Structure**:
+```xml
+<soap:Envelope>
+  <soap:Header>
+    <!-- optional auth -->
+  </soap:Header>
+  <soap:Body>
+    <PlaceOrderRequest>
+      <product_id>123</product_id>
+      <quantity>2</quantity>
+      <shipping_address>123 Main St</shipping_address>
+      <payment>
+        <card_number>4111111111111111</card_number>
+        <expiry>12/25</expiry>
+      </payment>
+    </PlaceOrderRequest>
+  </soap:Body>
+</soap:Envelope>
+```
 
-### 6.3 Event Integration
+## 3.3 Implementation
 
-- [ ] Modify `OrderService.PlaceOrder` to emit events (channel or callback)
-- [ ] Periodic analytics via `time.Ticker`
+- [ ] XML structs with `encoding/xml` tags
+- [ ] `SOAPAction` header handling
+- [ ] SOAP Fault for errors
+- [ ] Reuse `OrderService` + `PaymentService` (shared layer)
+- [ ] Endpoint: `POST /soap`
 
-### 6.4 WebSocket Endpoint
+## 3.4 Payment Simulation
 
-- [ ] Register `/ws` in `main.go`
-- [ ] Subscription topics: `"orders"`, `"analytics"`
-- [ ] Clean connection teardown, no goroutine leaks
-
----
-
-## Phase 7: Final Integration
-
-### 7.1 main.go Refactoring
-
-- [ ] Extract server setup if warranted
-- [ ] All services share repos (single DB pool)
-- [ ] Configuration management (ports, timeouts, pool sizes)
-- [ ] Graceful shutdown for HTTP + gRPC + WebSocket
-
-### 7.2 Testing
-
-- [ ] Unit tests for services (mock repos via interfaces)
-- [ ] Unit tests for handlers (mock services via interfaces)
-- [ ] **Define handler interfaces for testability (Review #16)** — create `ProductHandlerInterface`, `OrderHandlerInterface` to enable mocking
-- [ ] Table-driven test style
-- [ ] `go test -cover ./...` — aim for meaningful coverage on service logic
-
-### 7.3 Manual Testing Checklist
-
-- [ ] REST: curl all product + order endpoints
-- [ ] GraphQL: queries + mutations via Postman/Insomnia
-- [ ] SOAP: send SOAP envelope for order placement
-- [ ] gRPC: `grpcurl` analytics methods
-- [ ] WebSocket: `wscat` real-time updates
-
-### 7.4 Documentation
-
-- [ ] Update `README.md` with all endpoints and examples
-- [ ] Document GraphQL schema
-- [ ] Document SOAP WSDL location
-- [ ] Document gRPC proto reference
-- [ ] Document WebSocket message formats
+- [ ] Simulate authorization (success/failure)
+- [ ] Return appropriate SOAP response
+- [ ] Link order + payment in database
 
 ---
 
-### Final Checkpoint
+# Phase 4: gRPC Analytics
 
-**Architecture:**
-- [ ] All 5 APIs share the same service + repository layers
-- [ ] No business logic in handlers/resolvers
-- [ ] Clean dependency injection throughout
-- [ ] Single database connection pool shared
+## 4.1 Protocol Buffer Definition
 
-**Go Conventions:**
-- [ ] Consistent error handling (`errors.Is`, `fmt.Errorf` with `%w`)
-- [ ] Standard library `errors` only (no `pkg/errors`)
-- [ ] Context propagated everywhere, by value
-- [ ] No circular dependencies
+**File**: `proto/analytics.proto`
 
-**Performance & Concurrency:**
-- [ ] HTTP + gRPC servers run concurrently
-- [ ] WebSocket hub manages goroutines cleanly
-- [ ] No goroutine leaks (`runtime.NumGoroutine()`)
-- [ ] DB pool configured
+```protobuf
+service AnalyticsService {
+  rpc GetTotalSales(GetTotalSalesRequest) returns (GetTotalSalesResponse);
+  rpc GetAverageOrderValue(GetAverageOrderValueRequest) returns (GetAverageOrderValueResponse);
+  rpc GetTopProducts(GetTopProductsRequest) returns (stream ProductStat);
+  rpc GetLowStockProducts(GetLowStockProductsRequest) returns (stream ProductStat);
+}
+```
 
-**Security:**
-- [ ] Parameterized SQL only
-- [ ] No request body logging
-- [ ] Error messages never leak internal details
+**Messages**:
+```protobuf
+message GetTotalSalesRequest {
+  // optional date range
+}
+
+message GetTotalSalesResponse {
+  int64 total_orders = 1;
+  double total_revenue = 2;
+}
+
+message ProductStat {
+  int64 product_id = 1;
+  string product_name = 2;
+  int64 units_sold = 3;
+  double revenue = 4;
+}
+```
+
+## 4.2 Implementation
+
+- [ ] Generate Go code from proto
+- [ ] Create `AnalyticsService` in `services/`
+- [ ] Add aggregate SQL queries to repo
+- [ ] Implement gRPC server in `api/grpc/`
+- [ ] Run on separate port (`:50051`)
+
+## 4.3 Streaming (Optional)
+
+- [ ] Server-side streaming for top products / low stock
+- [ ] Demonstrates gRPC streaming capability
+
+---
+
+# Phase 5: WebSocket Real-time
+
+## 5.1 WebSocket Architecture
+
+**Library**: `nhooyr.io/websocket` (context-aware, modern)
+
+**Connection Management**: Hub pattern
+- `clients` — map of connections
+- `broadcast` — channel for messages
+- `register/unregister` — channels for connection lifecycle
+
+## 5.2 Events
+
+**Subscription topics**:
+- [ ] `orders` — new order created
+- [ ] `payments` — payment status changed
+- [ ] `alerts` — low stock warnings
+
+**Message Format**:
+```json
+{
+  "type": "order_created",
+  "data": {
+    "order_id": 123,
+    "total_price": 99.99,
+    "status": "paid"
+  }
+}
+```
+
+## 5.3 Integration
+
+- [ ] Create `hub` struct with run loop
+- [ ] HTTP upgrade handler at `/ws`
+- [ ] Per-connection read/write pumps
+- [ ] Emit events from service layer (channel or callback)
+- [ ] Graceful disconnect handling
+
+---
+
+# Phase 6: Cleanup + Documentation
+
+## 6.1 Reset Mechanism
+
+**Mechanism**: Database TTL (CockroachDB native)
+
+**Implementation**:
+- [ ] Add `ttl_expires_at` column to each table
+- [ ] Configure TTL policy: rows expire after 3 hours of inactivity
+- [ ] Row access updates `ttl_expires_at` (reset the timer)
+- [ ] Optional: `ALTER TABLE products SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at')`
+
+**Note**: CockroachDB handles auto-deletion. No API endpoint needed.
+
+## 6.2 README
+
+**Content**:
+- [ ] Overview of each API style
+- [ ] REST endpoints with curl examples
+- [ ] GraphQL queries examples
+- [ ] SOAP request/response samples
+- [ ] gRPC `grpcurl` examples
+- [ ] WebSocket client example
+
+## 6.3 Testing Checklist
+
+- [ ] REST: curl all endpoints
+- [ ] GraphQL: queries via Postman/Insomnia
+- [ ] SOAP: XML envelope examples
+- [ ] gRPC: `grpcurl` commands
+- [ ] WebSocket: client connection test
+
+---
+
+# Architecture Principles
+
+## Service/Repo Layer API-Agnostic
+
+All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service layer**:
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  API Handlers (REST / GraphQL / SOAP / gRPC / WebSocket)       │
+├────────────────────────────────────────────────────────────────┤
+│  Services (ProductService, OrderService, PaymentService...)    │
+│  - Business logic only                                         │
+│  - No HTTP/gRPC/WS knowledge                                   │
+├────────────────────────────────────────────────────────────────┤
+│  Repos (ProductRepo, OrderRepo, PaymentRepo...)                │
+│  - Database access only                                        │
+│  - No business logic                                           │
+├────────────────────────────────────────────────────────────────┤
+│  Database (CockroachDB)                                         │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Why**:
+- Avoid duplication of business logic
+- Consistency across API styles
+- Easier testing (mock services)
+- Clear separation of concerns
+
+---
+
+# Technical Standards
+
+## Error Handling
+- Use sentinel errors from `utils/errors.go`
+- Wrap with context: `fmt.Errorf("service.Method: %w", err)`
+- Return structured errors (not internal details)
+
+## Database
+- Parameterized queries only (no string concat)
+- Lowercase SQL keywords
+- Configure connection pool
+
+## Context
+- Pass `context.Context` as first parameter, by value
+- Propagate `r.Context()` from HTTP handlers
+
+## Naming
+- Files: `snake_case.go`
+- Interfaces: `PascalCase`
+- Functions: `camelCase`
+
+## Logging
+- Use `zap` logger
+- Structure: `logger.Info("message", zap.String("key", value))`
+- Never log request bodies (may contain PII/secrets)
+
+---
+
+# Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `jackc/pgx/v5` | PostgreSQL/CockroachDB driver |
+| `jmoiron/sqlx` | Database access |
+| `go.uber.org/zap` | Structured logging |
+| `graphql-go/graphql` | GraphQL implementation |
+| `nhooyr.io/websocket` | WebSocket implementation |
+
+---
+
+# Endpoints Summary
+
+## REST (`:8080`)
+
+```
+/products         GET, POST
+/products/{id}    GET, PATCH, DELETE
+/orders           GET, POST
+/orders/{id}      GET, PATCH
+/payments         POST
+/payments/{id}    GET
+/graphql          POST    # GraphQL
+```
+
+## SOAP (`:8080/soap`)
+
+```
+POST /soap        PlaceOrder, GetPaymentStatus
+```
+
+## gRPC (`:50051`)
+
+```
+AnalyticsService: GetTotalSales, GetAverageOrderValue, GetTopProducts, GetLowStockProducts
+```
+
+## WebSocket (`:8080/ws`)
+
+```
+WS /ws            Subscribe to: orders, payments, alerts
+```
