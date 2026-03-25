@@ -37,10 +37,10 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - `product_id` (int64, FK)
 - `quantity` (int)
 - `total_price` (float64)
+- `order_time` (timestamp)
 - `status` (string: "pending", "paid", "failed")
 - `shipping_address` (string) — updatable
 - `notes` (string) — updatable
-- `created_at` (timestamp)
 - `ttl_expires_at` (timestamp)
 
 ### Payment
@@ -317,11 +317,24 @@ message ProductStat {
 
 **Mechanism**: Database TTL (CockroachDB native)
 
+**How TTL works**:
+1. Each table has `ttl_expires_at` column (timestamp)
+2. CockroachDB auto-deletes rows when current time > `ttl_expires_at`
+3. Sample data: `ttl_expires_at = NULL` (never expires)
+4. User-inserted data: `ttl_expires_at = NOW() + 3 hours`
+
 **Implementation**:
-- [ ] Add `ttl_expires_at` column to each table
-- [ ] Configure TTL policy: rows expire after 3 hours of inactivity
-- [ ] Row access updates `ttl_expires_at` (reset the timer)
-- [ ] Optional: `ALTER TABLE products SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at')`
+- [ ] Add `ttl_expires_at` column to products, orders, payments tables
+- [ ] Enable TTL on tables:
+  ```sql
+  ALTER TABLE products SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
+  ALTER TABLE orders SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
+  ALTER TABLE payments SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
+  ```
+- [ ] Service layer: set `ttl_expires_at = NOW() + 3 hours` on new inserts
+- [ ] On row read: optionally update `ttl_expires_at` to reset timer
+
+**Sample data**: Always `ttl_expires_at = NULL` (permanent)
 
 **Note**: CockroachDB handles auto-deletion. No API endpoint needed.
 

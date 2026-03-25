@@ -1,0 +1,4 @@
+-- Step 5: Enable TTL (optional - uncomment when ready for auto-deletion)
+-- ALTER TABLE products SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
+-- ALTER TABLE orders SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
+-- ALTER TABLE payments SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
