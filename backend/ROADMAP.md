@@ -24,7 +24,7 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 ## Data Models
 
 ### Product
-- `prod_id` (int64)
+- `prod_id` (string) — format: `PR-XXXXXX` (primary key)
 - `prod_name` (string)
 - `price` (float64)
 - `stock` (int)
@@ -33,8 +33,8 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - `ttl_expires_at` (timestamp) — for auto-cleanup
 
 ### Order
-- `order_id` (int64)
-- `product_id` (int64, FK)
+- `order_id` (string) — format: `OR-XXXXXX` (primary key)
+- `product_id` (string, FK) — references `prod_id`
 - `quantity` (int)
 - `total_price` (float64)
 - `order_time` (timestamp)
@@ -44,14 +44,16 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - `ttl_expires_at` (timestamp)
 
 ### Payment
-- `payment_id` (int64)
-- `order_id` (int64, FK)
+- `payment_id` (string) — format: `PA-XXXXXX` (primary key)
+- `order_id` (string, FK) — references `order_id`
 - `amount` (float64)
 - `status` (string: "pending", "success", "failed")
 - `card_number` (string) — stored for simulation validation
 - `card_last_four` (string) — last 4 digits
 - `created_at` (timestamp)
 - `ttl_expires_at` (timestamp)
+
+> **Note**: ID is generated in the service layer. Format: `PR-` for products, `OR-` for orders, `PA-` for payments. Use short random string (6 chars) after prefix.
 
 ---
 
@@ -84,6 +86,11 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - [ ] Add proper error handling
 - [ ] Validate inputs (name required, price > 0, stock >= 0)
 
+**ID generation**:
+- [ ] Change `prod_id` from INT8 to STRING in models and repos
+- [ ] Generate `PR-XXXXXX` ID in service layer on create (6-char random/alphanumeric)
+- [ ] Update all product handlers/repos to use string IDs
+
 ## 1.2 Complete Orders CRUD
 
 **Endpoints**:
@@ -96,6 +103,7 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - [ ] Validate product exists and has sufficient stock
 - [ ] Decrement stock on order creation
 - [ ] Auto-set order status based on payment (handled later)
+- [ ] Generate `OR-XXXXXX` ID in service layer on create
 
 ## 1.3 Complete Payments API
 
@@ -103,6 +111,7 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - [ ] `POST /payments` — create payment (simulate authorize)
 - [ ] `GET /payments/{id}` — get payment status
 - [ ] Link payment to order via `order_id`
+- [ ] Generate `PA-XXXXXX` ID in service layer on create
 
 ## Payment simulation
 
@@ -325,11 +334,11 @@ message ProductStat {
 
 **Implementation**:
 - [ ] Add `ttl_expires_at` column to products, orders, payments tables
-- [ ] Enable TTL on tables:
+- [ ] Enable TTL on tables using `ttl_expiration_expression`:
   ```sql
-  ALTER TABLE products SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
-  ALTER TABLE orders SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
-  ALTER TABLE payments SET (ttl = 'ttl EXPIRATION STORED TO ttl_expires_at');
+  ALTER TABLE products SET (ttl_expiration_expression = 'ttl_expires_at');
+  ALTER TABLE orders SET (ttl_expiration_expression = 'ttl_expires_at');
+  ALTER TABLE payments SET (ttl_expiration_expression = 'ttl_expires_at');
   ```
 - [ ] Service layer: set `ttl_expires_at = NOW() + 3 hours` on new inserts
 - [ ] On row read: optionally update `ttl_expires_at` to reset timer
