@@ -2,14 +2,15 @@ package utils
 
 import (
 	"encoding/json"
-	"github.com/jmoiron/sqlx"
-	"github.com/joho/godotenv"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func getEnvVar(key string) string {
