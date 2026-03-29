@@ -73,23 +73,40 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 ## 1.1 Complete Product CRUD
 
-**Existing** (needs cleanup):
+**Implemented routes** (differs from target naming below — consolidate on `/products` + `/products/{id}` when convenient):
+- [x] `POST /product` — create product
+- [x] `GET /products` — list all products
+- [x] `GET /product/{id}` — get single product
+- [x] `PATCH /product` — update product (`prod_id` in JSON body)
+- [x] `DELETE /product/{id}` — delete product *(still returns 200 with JSON; Phase 1 target is 204 No Content)*
+
+**Target REST shape** (documentation / client examples):
 - [ ] `POST /products` — create product
-- [ ] `GET /products` — list all products
+- [x] `GET /products` — list all products *(path matches; POST not on `/products` yet)*
 - [ ] `GET /products/{id}` — get single product
 - [ ] `PATCH /products/{id}` — update product
 - [ ] `DELETE /products/{id}` — delete product
 
-**Fixes needed** (from prior review):
-- [ ] Fix HTTP status codes (200/201/204)
-- [ ] Remove request body logging
-- [ ] Add proper error handling
-- [ ] Validate inputs (name required, price > 0, stock >= 0)
+**Code review follow-ups** (see `agent-reviews/2026-03-12.md`):
+- [x] **#1** Context by value for `UpdateByID` (not `*context.Context`)
+- [x] **#2** GraphQL: handle invalid JSON and empty `query`
+- [x] **#3** ParseInt / invalid path ID returns 400
+- [ ] **#4** HTTP status codes — GET and PATCH use 200; **DELETE should be 204** without a body
+- [ ] **#5** Error logging — replace remaining `fmt.Errorf(...).Error()` as log message with message + `zap.Error(err)`
+- [ ] **#6** Input validation — name required, price > 0, stock >= 0 (struct tags are still inert)
+- [ ] **#7** Use `time.Time` (or DB TIMESTAMPTZ) instead of `string` for timestamps in models
+- [ ] **#8** Load `.env` once at startup, not on every `getEnvVar` call
+- [ ] **#9** Configure DB connection pool (max open, idle, conn lifetime)
+- [ ] **#10** Remove request body logging (REST + GraphQL debug paths)
+- [ ] **#12** Lowercase SQL consistently in `product_repo.go`
+- [x] **#13** Use `errors.Is` for sentinel and `sql.ErrNoRows` in handlers
+- [x] **#14** Close `*sqlx.Rows` in `UpdateByID` (`defer result.Close()`)
+- [x] **#15** Sentinel errors use standard library `errors` (`utils/errors.go`)
 
-**ID generation**:
-- [ ] Change `prod_id` from INT8 to STRING in models and repos
-- [ ] Generate `PR-XXXXXX` ID in service layer on create (6-char random/alphanumeric)
-- [ ] Update all product handlers/repos to use string IDs
+**ID generation** (still numeric IDs end-to-end in handlers/services/repos):
+- [ ] String `PR-XXXXXX` (and repos/handlers using `string` IDs) per data model above
+- [ ] Generate ID in service layer on create
+- [ ] Migrate DB / models if still integer `prod_id`
 
 ## 1.2 Complete Orders CRUD
 
@@ -324,13 +341,19 @@ message ProductStat {
 
 ## 6.1 Reset Mechanism
 
-**Mechanism**: Database TTL (CockroachDB native)
+**Mechanism**: Database TTL (CockroachDB native) with configurable duration
 
 **How TTL works**:
-1. Each table has `ttl_expires_at` column (timestamp)
+1. Each table has `ttl_expires_at` column (TIMESTAMPTZ)
 2. CockroachDB auto-deletes rows when current time > `ttl_expires_at`
 3. Sample data: `ttl_expires_at = NULL` (never expires)
-4. User-inserted data: `ttl_expires_at = NOW() + 3 hours`
+4. User-inserted data: `ttl_expires_at = NOW() + TTL_DURATION`
+
+**TTL Duration Configuration**:
+- [ ] Add `TTL_DURATION` environment variable (default: 3 hours, min: 1 minute)
+- [ ] Service layer reads `TTL_DURATION` on startup
+- [ ] On insert: set `ttl_expires_at = NOW() + TTL_DURATION`
+- [ ] On update: reset `ttl_expires_at = NOW() + TTL_DURATION` (if updating row)
 
 **Implementation**:
 - [ ] Add `ttl_expires_at` column to products, orders, payments tables
@@ -340,7 +363,7 @@ message ProductStat {
   ALTER TABLE orders SET (ttl_expiration_expression = 'ttl_expires_at');
   ALTER TABLE payments SET (ttl_expiration_expression = 'ttl_expires_at');
   ```
-- [ ] Service layer: set `ttl_expires_at = NOW() + 3 hours` on new inserts
+- [ ] Service layer: set `ttl_expires_at = NOW() + TTL_DURATION` on new inserts
 - [ ] On row read: optionally update `ttl_expires_at` to reset timer
 
 **Sample data**: Always `ttl_expires_at = NULL` (permanent)
@@ -441,6 +464,15 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 
 ## REST (`:8080`)
 
+**Current implementation**
+```
+/product          POST (create), PATCH (update)
+/products         GET (list)
+/product/{id}     GET, DELETE
+/graphql          POST
+```
+
+**Planned (Phase 1 complete)**
 ```
 /products         GET, POST
 /products/{id}    GET, PATCH, DELETE
@@ -448,7 +480,7 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 /orders/{id}      GET, PATCH
 /payments         POST
 /payments/{id}    GET
-/graphql          POST    # GraphQL
+/graphql          POST
 ```
 
 ## SOAP (`:8080/soap`)
