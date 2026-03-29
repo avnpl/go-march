@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -75,11 +76,19 @@ func main() {
 			return
 		}
 
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			utils.SendInternalError(w)
+			return
+		}
+		logger.Debug("graphql body", zap.String("body", string(bodyBytes)))
+
 		var params struct {
 			Query string `json:"query"`
 		}
-		err := json.NewDecoder(r.Body).Decode(&params)
+		err = json.Unmarshal(bodyBytes, &params)
 		if err != nil {
+			logger.Error("something went wrong decoding the request")
 			utils.SendJSONError(w, http.StatusBadRequest, "Invalid Request")
 			return
 		}
