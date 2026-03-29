@@ -29,6 +29,7 @@ func NewProductHandler(svc services.ProductService, log *zap.Logger) ProductHand
 func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
+		// TODO Analyse all error logging, strategies, etc
 		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(), zap.Error(err))
 		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid JSON")
 		return
@@ -89,7 +90,7 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(prod)
 }
 
@@ -138,7 +139,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(prod)
 }
 
@@ -169,6 +170,6 @@ func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(prod)
 }
