@@ -26,15 +26,15 @@
 ```
 ├── main.go
 ├── api/
-│   ├── rest/            # HTTP handlers (ProductHandler, OrderHandler)
+│   ├── rest/            # HTTP handlers (ProductHandler)
 │   ├── graphql/         # schema.go, types.go, queries.go, mutations.go, resolvers.go
-│   ├── grpc/            # grpc.go (stubbed)
-│   └── soap/            # soap.go (stubbed)
-├── services/            # Business logic — ProductService, OrderService
-├── repos/               # DB access — ProductRepo, OrderRepo
-├── models/              # models.go — Product, Orders, request structs
-├── utils/               # utils.go, errors.go, validations.go
-└── reviews/             # Code review notes (date-named files)
+│   ├── grpc/            # grpc.go (stub package)
+│   └── soap/            # soap.go (stub package)
+├── services/            # Business logic — ProductService (OrderService not wired yet)
+├── repos/               # DB access — ProductRepo (order/payment repos not present)
+├── models/              # models.go — Product, Orders (struct only), request structs
+├── utils/               # utils.go, errors.go; validations.go (placeholder)
+└── agent-reviews/       # Code review notes (date-named markdown files)
 ```
 
 **Note:** There is no `handlers/` directory — handlers live under `api/`.
@@ -45,11 +45,11 @@
 
 | API | Purpose | Status |
 |-----|---------|--------|
-| REST | Product CRUD | ✅ Complete |
-| GraphQL | Flexible data fetching for products & orders | 🔶 Partial (missing `createProduct`, `deleteProduct`, all order ops) |
-| SOAP | Transactional order placement | 🚧 Stubbed |
-| gRPC | Analytics procedures | 🚧 Stubbed |
-| WebSocket | Real-time order/analytics streaming | 🚧 Stubbed |
+| REST | Product CRUD (+ future orders/payments) | 🔶 Phase 1 in progress — product endpoints work; paths differ from roadmap (`/product` vs `/products/{id}`); DELETE should be 204; string `PR-…` IDs and validation still open (see `ROADMAP.md`) |
+| GraphQL | Product queries + mutations | 🔶 Partial — `getProductByID`, `getAllProducts`; `updateProduct`, `deleteProduct`; no `createProduct`; no order API (Phase 2) |
+| SOAP | Transactional order placement | 🚧 Stub package only |
+| gRPC | Analytics procedures | 🚧 Stub package only |
+| WebSocket | Real-time notifications | 🚧 Not implemented |
 
 For the full implementation roadmap see [`ROADMAP.md`](./ROADMAP.md).
 
@@ -66,11 +66,11 @@ For the full implementation roadmap see [`ROADMAP.md`](./ROADMAP.md).
 | `api/rest/product_handler.go` | REST handlers: Create, Fetch, FetchAll, Update, Delete |
 | `api/graphql/schema.go` | GraphQL schema init (`NewSchema`, `Schema`) |
 | `api/graphql/types.go` | `ProductType`, `UpdateProductInput` |
-| `api/graphql/queries.go` | `product(id)`, `products` queries |
-| `api/graphql/mutations.go` | `updateProduct` mutation |
+| `api/graphql/queries.go` | `getProductByID`, `getAllProducts` |
+| `api/graphql/mutations.go` | `updateProduct`, `deleteProduct` |
 | `api/graphql/resolvers.go` | `Resolver` struct with resolver methods |
 | `utils/utils.go` | `BuildLogger`, `GetDBPoolObject`, `SendJSONError`, `SendInternalError` |
-| `utils/errors.go` | Sentinel errors: `ErrConflict`, `ErrInternal`, `ErrNotFound`, etc. |
+| `utils/errors.go` | Sentinel errors: `ErrConflict`, `ErrInternal`, `ErrInvalidRequest`, `ErrRecordNotFound` |
 
 ---
 
@@ -129,8 +129,8 @@ logger.Error(fmt.Errorf("error: %w", err).Error(), zap.Error(err))
 
 ```go
 type ProductService interface {
-    CreateProduct(ctx context.Context, req *models.CreateProductReq) (*models.Product, error)
-    GetProductByID(ctx context.Context, id string) (*models.Product, error)
+    CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error)
+    GetProductByID(ctx context.Context, id int64) (models.Product, error)
 }
 ```
 
@@ -195,9 +195,9 @@ go vet ./...
 
 ### Environment
 
-Create `.env` in this directory:
+Create `.env` in this directory (variable names must match `utils.GetDBPoolObject`):
 ```
-DATABASE_URL=postgresql://user:pass@host:26257/dbname?sslmode=disable
+DB_URL=postgresql://user:pass@host:26257/dbname?sslmode=disable
 LOG_LEVEL=debug
 ```
 
@@ -207,15 +207,18 @@ Load `.env` once at startup in `main()` — not inside utility functions called 
 
 ## Known Technical Debt
 
-See [`ROADMAP.md`](./ROADMAP.md) Phase 0 and Phase 1 for actionable fix tasks. Summary:
+See [`ROADMAP.md`](./ROADMAP.md) Phase 1 and [`agent-reviews/2026-03-12.md`](./agent-reviews/2026-03-12.md) for detail. Summary:
 
-1. `ProductRepo.UpdateByID` takes `*context.Context` — should be `context.Context`
-2. `Orders.Amount` is `string` — should be `float64`
-3. GraphQL missing `createProduct` and `deleteProduct` mutations
-4. `validate:"required"` tags on request structs are inert — no validator reads them
-5. No database migration files
-6. `.env` loaded on every `getEnvVar` call instead of once at startup
-7. No DB connection pool configuration
+1. REST paths: implement `/products` and `/products/{id}` consistently; product DELETE should return 204 with no body.
+2. Product IDs: roadmap targets string `PR-XXXXXX` from the service layer; code still uses `int64` in handlers/services/repos.
+3. `Product` / `Orders` timestamps and `Orders.Amount` are still `string` in models — prefer `time.Time` / `float64`.
+4. `validate:"required"` tags are inert unless a validator is added or manual checks are implemented.
+5. GraphQL: no `createProduct`; no order queries (Phase 2).
+6. No database migration files in-repo.
+7. `.env` is loaded on every `getEnvVar` call; connection pool is not configured after `sqlx.Connect`.
+8. Request bodies are still logged at debug in places (REST and `/graphql`) — remove or gate for production.
+9. Mixed-case SQL in `product_repo.go` — normalize to lowercase keywords.
+10. Residual `fmt.Errorf(...).Error()` as the log message in some REST handler paths — prefer static message + `zap.Error(err)`.
 
 ---
 
