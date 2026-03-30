@@ -287,13 +287,13 @@ These issues should be resolved before implementing orders/payments to avoid pro
   - Example: `h.log.Error("failed to fetch product", zap.Error(err), zap.String("id", idStr))`
   - Currently some error logs lack context (e.g., `product_handler.go:100` — no context on FetchAll failure)
 
-**ID generation** (still numeric `int64` IDs end-to-end in handlers/services/repos):
+**ID generation**:
 - [ ] Change `prod_id` from INT8 to STRING in database schema
-- [ ] Update `models.Product` — `ProductID` already has `string` JSON tag but handlers parse as `int64`
-- [ ] Update `ProductRepo` interface and `pgProductRepo` — methods take/return `string` IDs
-- [ ] Update `ProductService` interface and implementation — methods take/return `string` IDs
-- [ ] Update REST handlers — remove `strconv.ParseInt`, use path value directly as string
-- [ ] Update GraphQL resolvers — type-assert `id` as `string` instead of converting to `int64`
+- [x] Update `models.Product` — `ProductID` already has `string` JSON tag; added `TTLExpires` field
+- [x] Update `ProductRepo` interface and `pgProductRepo` — methods take/return `string` IDs
+- [x] Update `ProductService` interface and implementation — methods take/return `string` IDs
+- [x] Update REST handlers — remove `strconv.ParseInt`, use path value directly as string
+- [x] Update GraphQL resolvers — type-assert `id` as `string` instead of converting to `int64`
 - [ ] Generate `PR-XXXXXX` ID in service layer on create (6-char random alphanumeric after prefix)
   - Use `crypto/rand` or `math/rand` with seed for ID generation
   - Example: `PR-A1B2C3`, `PR-9XYZ42`
