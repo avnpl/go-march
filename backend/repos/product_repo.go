@@ -12,7 +12,7 @@ import (
 
 type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) (models.Product, error)
-	FetchByID(ctx context.Context, id int64) (models.Product, error)
+	FetchByID(ctx context.Context, id string) (models.Product, error)
 	FetchAll(ctx context.Context) ([]models.Product, error)
 	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id int64) (models.Product, error)
@@ -36,7 +36,7 @@ func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Pr
 	return res, nil
 }
 
-func (r pgProductRepo) FetchByID(ctx context.Context, id int64) (models.Product, error) {
+func (r pgProductRepo) FetchByID(ctx context.Context, id string) (models.Product, error) {
 	const query = "SELECT * FROM PRODUCTS WHERE PROD_ID = $1"
 
 	var result models.Product

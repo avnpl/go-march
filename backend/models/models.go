@@ -1,12 +1,15 @@
 package models
 
+import "database/sql"
+
 type Product struct {
-	ProductID string  `db:"prod_id" json:"prod_id"`
-	Name      string  `db:"prod_name" json:"prod_name"`
-	Price     float64 `db:"price" json:"price"`
-	Stock     int     `db:"stock" json:"stock"`
-	CreatedAt string  `db:"created_at" json:"created_at"`
-	UpdatedAt string  `db:"updated_at" json:"updated_at"`
+	ProductID  string       `db:"prod_id" json:"prod_id"`
+	Name       string       `db:"prod_name" json:"prod_name"`
+	Price      float64      `db:"price" json:"price"`
+	Stock      int          `db:"stock" json:"stock"`
+	CreatedAt  string       `db:"created_at" json:"created_at"`
+	UpdatedAt  string       `db:"updated_at" json:"updated_at"`
+	TTLExpires sql.NullTime `db:"ttl_expires_at" json:"-"`
 }
 
 type Orders struct {

@@ -73,13 +73,7 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 
 	h.log.Debug("received ID => ", zap.String("request param", idStr))
 
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		h.log.Error("FetchProduct failed", zap.Error(err))
-		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid ID format")
-		return
-	}
-	prod, err := h.svc.GetProductByID(r.Context(), id)
+	prod, err := h.svc.GetProductByID(r.Context(), idStr)
 	if err != nil {
 		h.log.Error("GetProductByID failed", zap.Error(err))
 		if errors.Is(err, sql.ErrNoRows) {

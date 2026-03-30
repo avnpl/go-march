@@ -26,17 +26,12 @@ func (r *Resolver) GetProductByID(p graphql.ResolveParams) (interface{}, error) 
 		return nil, nil
 	}
 
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx := p.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	product, err := r.productService.GetProductByID(ctx, id)
+	product, err := r.productService.GetProductByID(ctx, idStr)
 	if err != nil {
 		return nil, err
 	}

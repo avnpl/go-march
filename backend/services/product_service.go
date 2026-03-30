@@ -11,7 +11,7 @@ import (
 
 type ProductService interface {
 	CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error)
-	GetProductByID(ctx context.Context, id int64) (models.Product, error)
+	GetProductByID(ctx context.Context, id string) (models.Product, error)
 	GetAllProducts(ctx context.Context) ([]models.Product, error)
 	UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error)
 	DeleteProduct(ctx context.Context, id int64) (models.Product, error)
@@ -42,7 +42,7 @@ func (s *productService) CreateProduct(ctx context.Context, req *models.CreatePr
 	return res, nil
 }
 
-func (s *productService) GetProductByID(ctx context.Context, id int64) (models.Product, error) {
+func (s *productService) GetProductByID(ctx context.Context, id string) (models.Product, error) {
 	var res models.Product
 	res, err := s.repo.FetchByID(ctx, id)
 	if err != nil {
