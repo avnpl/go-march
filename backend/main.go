@@ -13,6 +13,7 @@ import (
 
 	gql "github.com/avnpl/go-march/api/graphql"
 	"github.com/avnpl/go-march/api/rest"
+	"github.com/go-playground/validator/v10"
 	"github.com/graphql-go/graphql"
 
 	"github.com/avnpl/go-march/repos"
@@ -30,10 +31,12 @@ func main() {
 	db := utils.GetDBPoolObject(logger)
 	defer db.Close()
 
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
 	// Initialize the layers
 	productRepo := repos.NewPGProductRepo(db)
 	productService := services.NewProductService(productRepo, logger)
-	productHandler := rest.NewProductHandler(productService, logger)
+	productHandler := rest.NewProductHandler(productService, logger, validate)
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()

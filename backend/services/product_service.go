@@ -6,6 +6,7 @@ import (
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/repos"
+	"github.com/avnpl/go-march/utils"
 	"go.uber.org/zap"
 )
 
@@ -28,9 +29,10 @@ func NewProductService(r repos.ProductRepo, l *zap.Logger) ProductService {
 
 func (s *productService) CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error) {
 	p := models.Product{
-		Name:  req.Name,
-		Price: req.Price,
-		Stock: req.Stock,
+		Name:      req.Name,
+		Price:     req.Price,
+		Stock:     req.Stock,
+		ProductID: utils.GenerateID("PR"),
 	}
 
 	res, err := s.repo.Create(ctx, &p)

@@ -27,10 +27,10 @@ func NewPGProductRepo(db *sqlx.DB) ProductRepo {
 }
 
 func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
-	const query = "INSERT INTO products (prod_name, price, stock) VALUES ($1, $2, $3) RETURNING *"
+	const query = "INSERT INTO products (prod_id, prod_name, price, stock) VALUES ($1, $2, $3, $4) RETURNING *"
 
 	var res models.Product
-	if err := r.db.GetContext(ctx, &res, query, p.Name, p.Price, p.Stock); err != nil {
+	if err := r.db.GetContext(ctx, &res, query, p.ProductID, p.Name, p.Price, p.Stock); err != nil {
 		return models.Product{}, fmt.Errorf("product_repo.Create: %w", err)
 	}
 	return res, nil

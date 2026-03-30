@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -81,4 +82,17 @@ func SendJSONError(w http.ResponseWriter, statusCode int, message string) {
 
 func SendInternalError(w http.ResponseWriter) {
 	SendJSONError(w, http.StatusInternalServerError, "")
+}
+
+func GenerateID(prefix string) string {
+	const charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	var result strings.Builder
+	result.WriteString(prefix)
+	result.WriteString("-")
+
+	for range 7 {
+		result.WriteByte(charSet[rand.Intn(36)])
+	}
+
+	return result.String()
 }

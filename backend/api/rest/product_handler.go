@@ -12,17 +12,20 @@ import (
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
+	"github.com/avnpl/go-march/utils"
 	utilErrs "github.com/avnpl/go-march/utils"
+	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
 )
 
 type ProductHandler struct {
-	svc services.ProductService
-	log *zap.Logger
+	svc      services.ProductService
+	log      *zap.Logger
+	validate *validator.Validate
 }
 
-func NewProductHandler(svc services.ProductService, log *zap.Logger) ProductHandler {
-	return ProductHandler{svc: svc, log: log}
+func NewProductHandler(svc services.ProductService, log *zap.Logger, validate *validator.Validate) ProductHandler {
+	return ProductHandler{svc: svc, log: log, validate: validate}
 }
 
 func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
@@ -46,6 +49,14 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
+
+	err = h.validate.Struct(req)
+	if err != nil {
+		message := utils.FormatValidationErrors(err)
+		utilErrs.SendJSONError(w, http.StatusBadRequest, message)
+		return
+	}
+
 	prod, err := h.svc.CreateProduct(r.Context(), &req)
 	if err != nil {
 		h.log.Error("CreateProduct failed", zap.Error(err))

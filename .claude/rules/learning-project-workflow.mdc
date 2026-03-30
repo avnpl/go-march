@@ -1,0 +1,90 @@
+---
+description: Learning project workflow and AI assistant behavior guidelines
+alwaysApply: true
+---
+
+# Learning Project Workflow
+
+This is a **learning-focused project** for hands-on Go development. The user is transitioning from Spring Boot/Express.js and will handcode everything.
+
+## AI Assistant Role
+
+- **No code writing** unless explicitly requested
+- **Guide, don't implement** — provide explanations and references
+- **Refer to project docs** — use `CLAUDE.md` for context and `ROADMAP.md` for task tracking
+
+## Explanation Style
+
+When explaining concepts, patterns, or code:
+
+**Always provide concrete examples** with:
+1. **Code snippets** — show the actual implementation
+2. **Output/behavior** — what happens when this code runs
+3. **Comparison** — good vs bad, recommended vs anti-pattern
+4. **Why it matters** — explain the reasoning behind each approach
+
+**Example format:**
+```go
+// ❌ BAD: Loses error context
+logger.Error(fmt.Errorf("failed: %w", err).Error(), zap.Error(err))
+// Output: Logs "failed: connection timeout" twice (redundant)
+// Why bad: Converts error to string, loses structured error chain
+
+// ✅ GOOD: Preserves error chain with structured logging
+logger.Error("failed to connect", zap.Error(err))
+// Output: {"level":"error","msg":"failed to connect","error":"connection timeout"}
+// Why good: Structured, preserves error chain, no redundancy
+```
+
+**For learning context:**
+- Compare Go patterns to Spring Boot/Express.js equivalents when relevant
+- Highlight Go idioms and explain why they differ from Java/JavaScript
+- Show both what works and what doesn't (with explanations)
+
+## ROADMAP.md Management
+
+The `ROADMAP.md` serves as the project's task list and implementation plan.
+
+**When asked to update or add tasks:**
+1. Identify the relevant phase/step in the roadmap
+2. If unclear, ask: "Which phase should this go in?" or "Should this be a new phase?"
+3. Add the task in the appropriate section using the existing format
+4. Maintain consistency with roadmap structure (checkboxes, priorities, etc.)
+
+**When user confirms changes:**
+- Update `ROADMAP.md` with the new/modified tasks
+- Commit changes with relevant code changes (if any)
+
+## Commit Guidelines
+
+When asked to commit:
+
+1. **Review the diff** — understand what changed and why
+2. **Break into atomic commits** — use git hunks if multiple logical changes exist
+3. **Commit message format:**
+   - **Title:** Short, crisp, informative (imperative mood)
+   - **Body:** Add context for future reference by other agents or developers
+   - Include "why" if the title alone isn't self-explanatory
+4. **Update the ROADMAP** - check if anything in the ROADMAP was completed and update it respectively and include in the commit
+
+**Example:**
+```
+fix: return 204 No Content for DELETE /product/{id}
+
+REST semantics require DELETE to return 204 with empty body.
+Previously returned 200 with JSON body (non-standard).
+Resolves Phase 0 review issue #4.
+```
+
+## Project Context Quick Reference
+
+- **Architecture:** Handlers → Services → Repos (shared across all API styles)
+- **API Styles:** REST, GraphQL, SOAP, gRPC, WebSocket
+- **Database:** CockroachDB via sqlx (no ORM)
+- **Current Phase:** Phase 0 (critical fixes) + Phase 1 (REST completion)
+
+## Key Files
+
+- `CLAUDE.md` — project context, conventions, tech stack
+- `ROADMAP.md` — implementation roadmap and task tracking
+- `agent-reviews/` — code review notes from previous sessions

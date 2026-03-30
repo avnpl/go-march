@@ -223,7 +223,7 @@ These issues should be resolved before implementing orders/payments to avoid pro
   - Locations: `product_handler.go:32, 46, 68, 94, 106, 120`
   - Line 94 is worst: `fmt.Errorf("FetchAllProducts failed")` without `err` — loses error entirely
   - Pattern: `h.log.Error(fmt.Errorf("...%w", err).Error(), zap.Error(err))` → `h.log.Error("message", zap.Error(err))`
-- [ ] **#6** Input validation — name required, price > 0, stock >= 0
+- [x] **#6** Input validation — name required, price > 0, stock >= 0
   - Current: `validate:"required"` tags on `CreateProductReq` are inert — no validator reads them
   - Options: manual checks in handler/service, or add `github.com/go-playground/validator/v10`
   - Affects: `CreateProduct` and `UpdateProduct` handlers
@@ -294,7 +294,7 @@ These issues should be resolved before implementing orders/payments to avoid pro
 - [x] Update `ProductService` interface and implementation — methods take/return `string` IDs
 - [x] Update REST handlers — remove `strconv.ParseInt`, use path value directly as string
 - [x] Update GraphQL resolvers — type-assert `id` as `string` instead of converting to `int64`
-- [ ] Generate `PR-XXXXXX` ID in service layer on create (6-char random alphanumeric after prefix)
+- [x] Generate `PR-XXXXXX` ID in service layer on create (6-char random alphanumeric after prefix)
   - Use `crypto/rand` or `math/rand` with seed for ID generation
   - Example: `PR-A1B2C3`, `PR-9XYZ42`
   - Ensure uniqueness (retry on conflict or use timestamp component)
