@@ -88,7 +88,7 @@ func main() {
 		}
 		err = json.Unmarshal(bodyBytes, &params)
 		if err != nil {
-			logger.Error("something went wrong decoding the request")
+			logger.Error("failed to decode GraphQL request", zap.Error(err))
 			utils.SendJSONError(w, http.StatusBadRequest, "Invalid Request")
 			return
 		}

@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -29,8 +28,7 @@ func NewProductHandler(svc services.ProductService, log *zap.Logger) ProductHand
 func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		// TODO Analyse all error logging, strategies, etc
-		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(), zap.Error(err))
+		h.log.Error("error reading the request body", zap.Error(err))
 		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
@@ -44,7 +42,7 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 
 	var req models.CreateProductReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.log.Error(fmt.Errorf("invalid JSON : %w", err).Error())
+		h.log.Error("invalid JSON", zap.Error(err))
 		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
@@ -66,7 +64,7 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	if idStr == "" {
-		h.log.Error(fmt.Errorf("no ID provided in request").Error())
+		h.log.Error("no ID provided in request")
 		utilErrs.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
 		return
 	}
@@ -91,7 +89,7 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 func (h ProductHandler) FetchAllProducts(w http.ResponseWriter, r *http.Request) {
 	prods, err := h.svc.GetAllProducts(r.Context())
 	if err != nil {
-		h.log.Error(fmt.Errorf("FetchAllProducts failed").Error())
+		h.log.Error("FetchAllProducts failed", zap.Error(err))
 		utilErrs.SendInternalError(w)
 		return
 	}
@@ -103,7 +101,7 @@ func (h ProductHandler) FetchAllProducts(w http.ResponseWriter, r *http.Request)
 func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		h.log.Error(fmt.Errorf("error reading the request body : %w", err).Error(), zap.Error(err))
+		h.log.Error("error reading the request body", zap.Error(err))
 		utilErrs.SendInternalError(w)
 		return
 	}
@@ -117,7 +115,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	var req models.UpdateProductReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.log.Error(fmt.Errorf("invalid JSON : %w", err).Error())
+		h.log.Error("invalid JSON", zap.Error(err))
 		utilErrs.SendJSONError(w, http.StatusBadRequest, "Invalid JSON in the Request Body")
 		return
 	}
@@ -140,7 +138,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	if idStr == "" {
-		h.log.Error(fmt.Errorf("no ID provided in request").Error())
+		h.log.Error("no ID provided in request")
 		utilErrs.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
 		return
 	}
