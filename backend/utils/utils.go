@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
@@ -62,6 +63,14 @@ func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
 	if err != nil {
 		logger.Fatal("db connect failed", zap.Error(err))
 	}
+
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	if err := db.Ping(); err != nil {
+		logger.Fatal("db ping failed", zap.Error(err))
+	}
+
 	return db
 }
 

@@ -130,10 +130,17 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = h.validate.Struct(req)
+	if err != nil {
+		message := utils.FormatValidationErrors(err)
+		utils.SendJSONError(w, http.StatusBadRequest, message)
+		return
+	}
+
 	prod, err := h.svc.UpdateProduct(r.Context(), &req)
 	if err != nil {
 		if errors.Is(err, utils.ErrConflict) {
-			http.Error(w, err.Error(), http.StatusConflict)
+			utils.SendJSONError(w, http.StatusConflict, "")
 			return
 		}
 		utils.SendInternalError(w)

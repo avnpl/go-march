@@ -147,7 +147,7 @@ These issues should be resolved before implementing orders/payments to avoid pro
   - Move `godotenv.Load(".env")` from `getEnvVar` to `main()` before logger init
   - Or use `init()` in `utils` package (runs once on import)
   - Keep `getEnvVar` as simple `os.Getenv(key)` wrapper
-- [ ] **Database connection pool** — configure limits (review #9)
+- [x] **Database connection pool** — configure limits (review #9)
   - Add after `sqlx.Connect` in `utils.GetDBPoolObject`:
     ```go
     db.SetMaxOpenConns(25)              // Max concurrent connections
@@ -158,7 +158,7 @@ These issues should be resolved before implementing orders/payments to avoid pro
     }
     ```
   - Consider making these configurable via env vars
-- [ ] **SQL consistency** — lowercase keywords and identifiers (review #12)
+- [x] **SQL consistency** — lowercase keywords and identifiers (review #12)
   - Normalize `product_repo.go` queries to lowercase
   - Define query constants at package level for reusability
   - Example:
@@ -174,12 +174,12 @@ These issues should be resolved before implementing orders/payments to avoid pro
 
 **Priority: Medium** — can be done alongside 0.1-0.3 or deferred to Phase 1 cleanup
 
-- [ ] **Timestamp types** — use `time.Time` instead of `string` (review #7)
+- [x] **Timestamp types** — use `time.Time` instead of `string` (review #7)
   - Change `models.Product`: `CreatedAt time.Time`, `UpdatedAt time.Time`
   - Change `models.Orders`: `CreatedAt time.Time` (field is `order_time` in DB)
   - Update repo queries if needed (pgx/sqlx handle `time.Time` ↔ TIMESTAMPTZ automatically)
   - JSON serialization: Go's `json.Marshal` converts `time.Time` to RFC3339 format automatically
-- [ ] **Orders.Amount type** — change from `string` to `float64`
+- [x] **Orders.Amount type** — change from `string` to `float64`
   - Currently: `Amount string` with DB tag `total_price`
   - Should be: `TotalPrice float64` (align field name with DB column or use explicit tag)
 
@@ -274,7 +274,7 @@ These issues should be resolved before implementing orders/payments to avoid pro
   - Log mutations (create/update/delete) at Info level with entity ID
   - Don't log read operations (get/list) unless they fail
   - Document this policy in CLAUDE.md
-- [ ] **L6** Fix error response inconsistency in `UpdateProduct` handler
+- [x] **L6** Fix error response inconsistency in `UpdateProduct` handler
   - Location: `product_handler.go:134` — `http.Error(w, err.Error(), http.StatusConflict)`
   - Issue: exposes internal error messages to client
   - Fix: use `utilErrs.SendJSONError(w, http.StatusConflict, "")` like other handlers

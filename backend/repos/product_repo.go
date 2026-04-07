@@ -37,7 +37,7 @@ func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Pr
 }
 
 func (r pgProductRepo) FetchByID(ctx context.Context, id string) (models.Product, error) {
-	const query = "SELECT * FROM PRODUCTS WHERE PROD_ID = $1"
+	const query = "select * from products where prod_id = $1"
 
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
@@ -48,7 +48,7 @@ func (r pgProductRepo) FetchByID(ctx context.Context, id string) (models.Product
 }
 
 func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
-	const query = "SELECT * FROM PRODUCTS"
+	const query = "select * from products"
 
 	var result []models.Product
 	err := r.db.SelectContext(ctx, &result, query)
@@ -103,7 +103,7 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 }
 
 func (r pgProductRepo) DeleteByID(ctx context.Context, id int64) (models.Product, error) {
-	const query = "DELETE FROM products where PROD_ID = $1 RETURNING *"
+	const query = "delete from products where prod_id = $1 returning *"
 
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
