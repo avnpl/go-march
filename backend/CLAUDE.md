@@ -45,7 +45,7 @@
 
 | API | Purpose | Status |
 |-----|---------|--------|
-| REST | Product CRUD (+ future orders/payments) | 🔶 Phase 1 in progress — product endpoints work; paths differ from roadmap (`/product` vs `/products/{id}`); DELETE should be 204; string `PR-…` IDs and validation still open (see `ROADMAP.md`) |
+| REST | Product CRUD (+ future orders/payments) | 🔶 Phase 1 in progress — product endpoints work; paths differ from roadmap (`/product` vs `/products/{id}`); DELETE returns 200 with body (user preference); string `PR-…` IDs on create/fetch; Update/Delete paths still use `int64` (see `ROADMAP.md`, `TODO(id-migration)` in code) |
 | GraphQL | Product queries + mutations | 🔶 Partial — `getProductByID`, `getAllProducts`; `updateProduct`, `deleteProduct`; no `createProduct`; no order API (Phase 2) |
 | SOAP | Transactional order placement | 🚧 Stub package only |
 | gRPC | Analytics procedures | 🚧 Stub package only |
@@ -130,7 +130,8 @@ logger.Error(fmt.Errorf("error: %w", err).Error(), zap.Error(err))
 ```go
 type ProductService interface {
     CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error)
-    GetProductByID(ctx context.Context, id int64) (models.Product, error)
+    GetProductByID(ctx context.Context, id string) (models.Product, error)
+    DeleteProduct(ctx context.Context, id int64) (models.Product, error) // migrate id to string — see TODO(id-migration)
 }
 ```
 
@@ -207,18 +208,16 @@ Load `.env` once at startup in `main()` — not inside utility functions called 
 
 ## Known Technical Debt
 
-See [`ROADMAP.md`](./ROADMAP.md) Phase 1 and [`agent-reviews/2026-03-12.md`](./agent-reviews/2026-03-12.md) for detail. Summary:
+See [`ROADMAP.md`](./ROADMAP.md) Phase 0–1 and [`agent-reviews/2026-03-12.md`](./agent-reviews/2026-03-12.md) for detail. Summary (search `TODO` in code for exact locations):
 
-1. REST paths: implement `/products` and `/products/{id}` consistently; product DELETE should return 204 with no body.
-2. Product IDs: roadmap targets string `PR-XXXXXX` from the service layer; code still uses `int64` in handlers/services/repos.
-3. `Product` / `Orders` timestamps and `Orders.Amount` are still `string` in models — prefer `time.Time` / `float64`.
-4. `validate:"required"` tags are inert unless a validator is added or manual checks are implemented.
-5. GraphQL: no `createProduct`; no order queries (Phase 2).
-6. No database migration files in-repo.
-7. `.env` is loaded on every `getEnvVar` call; connection pool is not configured after `sqlx.Connect`.
-8. Request bodies are still logged at debug in places (REST and `/graphql`) — remove or gate for production.
-9. Mixed-case SQL in `product_repo.go` — normalize to lowercase keywords.
-10. Residual `fmt.Errorf(...).Error()` as the log message in some REST handler paths — prefer static message + `zap.Error(err)`.
+1. **ID migration (blocking):** Create and `GetProductByID` use string `PR-…` IDs; `UpdateProduct`, `DeleteProduct`, and GraphQL update/delete still use `int64` — breaks update/delete for string IDs until aligned end-to-end.
+2. **REST paths:** Target `/products` and `/products/{id}`; current routes use `/product`, `/products`, `/product/{id}`.
+3. **Validation:** `go-playground/validator` is wired; `validate:"required"` on numeric fields rejects zero-values — adjust tags (`gt=0`, `min=0`) per ROADMAP.
+4. **SQL style:** `Create` and `UpdateByID` in `product_repo.go` still use uppercase keywords; other queries are lowercase.
+5. **Logging:** Request bodies logged at debug (REST + `/graphql`) — remove or gate for production.
+6. **Misc:** `GenerateID` suffix length vs ROADMAP (6 vs 7 chars); `Orders.Amount` field name vs `TotalPrice`; GraphQL: no `createProduct`; no order queries (Phase 2).
+7. No database migration files in-repo.
+8. **Resolved (do not re-report):** `time.Time` on models; `.env` once in `main()`; DB pool configured; error logging uses static message + `zap.Error(err)`; `errors.Is` for sentinels.
 
 ---
 

@@ -20,14 +20,14 @@ Phase 5   WebSocket Real-time ──────────── notifications
 Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 ```
 
-**Current status**: Phase 0 in progress — product REST endpoints work but have code quality/security issues per `agent-reviews/2026-03-12.md`. Phase 1 orders/payments not started.
+**Current status**: Phase 0 mostly done (11/16 fixed). Remaining blockers: ID migration incomplete (Update/Delete still int64), SQL case inconsistency, request body logging. Phase 1 orders/payments not started.
 
 ## Progress Summary
 
 | Phase | Status | Completion |
 |-------|--------|------------|
-| **Phase 0** | 🔶 In Progress | 6/16 review issues fixed; 10 open (4 high priority, 6 medium) |
-| **Phase 1.1** | 🔶 Partial | Product CRUD functional; paths differ from target; validation/IDs/DELETE semantics open |
+| **Phase 0** | 🔶 In Progress | 11/16 review issues fixed; 5 remaining: #6 caveat, #10, #11, #12 partial, #16 deferred. Plus ID migration incomplete across Update/Delete paths. |
+| **Phase 1.1** | 🔶 Partial | Product CRUD functional; paths differ from target (`/product` vs `/products/{id}`); ID migration half-done (Create/Fetch use string, Update/Delete still int64) |
 | **Phase 1.2-1.4** | ⬜ Not Started | Orders, payments, payment simulation not implemented |
 | **Phase 2** | 🔶 Minimal | GraphQL has product queries/mutations only; no orders (target: Phase 2) |
 | **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket are stub packages |
@@ -93,60 +93,30 @@ These issues should be resolved before implementing orders/payments to avoid pro
 
 **Priority: High** — affects API contract and security
 
-- [ ] **DELETE semantics** — `DeleteProduct` should return 204 No Content with empty body (review #4)
-  - Remove JSON encoding after delete
-  - Change status from 200 to 204
-  - Update tests/docs to expect no response body
+- [x] **DELETE semantics** — user preference: returns 200 with deleted item in body (review #4)
 - [ ] **Request body logging** — remove or strictly gate (review #10, #11)
   - Security: request bodies may contain PII, passwords, tokens, credit cards
   - Remove `product_handler.go:38-41, 112-115` debug body logs
   - Remove `main.go:84` GraphQL body log (or gate with `if os.Getenv("LOG_REQUEST_BODIES") == "true"`)
   - Remove unused `strings` import after cleanup (review #11)
-- [ ] **Error logging pattern** — fix `fmt.Errorf(...).Error()` anti-pattern (review #5)
-  - Locations: `product_handler.go:32, 46, 68, 94, 106, 120`
-  - Pattern: `h.log.Error(fmt.Errorf("msg: %w", err).Error(), zap.Error(err))` → `h.log.Error("msg", zap.Error(err))`
-  - Critical: line 94 loses error entirely — `fmt.Errorf("FetchAllProducts failed")` without `%w`
-- [ ] **Error response consistency** — `UpdateProduct` exposes internal errors (logging improvement L6)
-  - Location: `product_handler.go:134`
-  - Change: `http.Error(w, err.Error(), http.StatusConflict)` → `utilErrs.SendJSONError(w, http.StatusConflict, "")`
+- [x] **Error logging pattern** — fixed; all handlers use static message + `zap.Error(err)` (review #5)
+- [x] **Error response consistency** — fixed; uses `utils.SendJSONError` (logging improvement L6)
 
 ## 0.2 Input Validation
 
 **Priority: High** — prevents invalid data in database
 
-- [ ] **Implement validation** for `CreateProductReq` (review #6)
-  - Option A: Manual checks in handler before calling service
-    ```go
-    if req.Name == "" {
-        utilErrs.SendJSONError(w, http.StatusBadRequest, "name is required")
-        return
-    }
-    if req.Price <= 0 {
-        utilErrs.SendJSONError(w, http.StatusBadRequest, "price must be greater than 0")
-        return
-    }
-    if req.Stock < 0 {
-        utilErrs.SendJSONError(w, http.StatusBadRequest, "stock cannot be negative")
-        return
-    }
-    ```
-  - Option B: Add `github.com/go-playground/validator/v10` and use struct tags
-  - Recommendation: Option A (fewer dependencies, explicit)
-- [ ] **Implement validation** for `UpdateProductReq`
-  - If `Name` provided: must not be empty string
-  - If `Price` provided: must be > 0
-  - If `Stock` provided: must be >= 0
-- [ ] **Remove or document** inert `validate` tags on structs
-  - Either use them (Option B above) or remove them to avoid confusion
+- [x] **Implement validation** for `CreateProductReq` (review #6)
+  - Used Option B: `go-playground/validator/v10` with struct tags
+  - **Caveat**: `validate:"required"` on `Price` (float64) and `Stock` (int) rejects zero-values. Fix: use `gt=0` for Price, `min=0` for Stock. See `TODO(#6-validation)` in `models/models.go`.
+- [x] **Implement validation** for `UpdateProductReq` — validator wired in handler
+- [x] **Remove or document** inert `validate` tags — tags are now active via `validator/v10`
 
 ## 0.3 Infrastructure Hardening
 
 **Priority: Medium** — improves reliability and performance
 
-- [ ] **Environment loading** — load `.env` once at startup (review #8)
-  - Move `godotenv.Load(".env")` from `getEnvVar` to `main()` before logger init
-  - Or use `init()` in `utils` package (runs once on import)
-  - Keep `getEnvVar` as simple `os.Getenv(key)` wrapper
+- [x] **Environment loading** — fixed; `.env` loaded once in `main()`, `GetEnvVar` is just `os.Getenv()` (review #8)
 - [x] **Database connection pool** — configure limits (review #9)
   - Add after `sqlx.Connect` in `utils.GetDBPoolObject`:
     ```go
@@ -158,17 +128,9 @@ These issues should be resolved before implementing orders/payments to avoid pro
     }
     ```
   - Consider making these configurable via env vars
-- [x] **SQL consistency** — lowercase keywords and identifiers (review #12)
-  - Normalize `product_repo.go` queries to lowercase
-  - Define query constants at package level for reusability
-  - Example:
-    ```go
-    const (
-        fetchByIDQuery  = "select * from products where prod_id = $1"
-        fetchAllQuery   = "select * from products"
-        deleteByIDQuery = "delete from products where prod_id = $1 returning *"
-    )
-    ```
+- [ ] **SQL consistency** — partially done (review #12)
+  - `FetchByID`, `FetchAll`, `DeleteByID` are lowercase ✅
+  - `Create` and `UpdateByID` still use uppercase keywords (`INSERT INTO`, `UPDATE`, `SET`, `WHERE`, `RETURNING`) — see `TODO(#12)` in `product_repo.go`
 
 ## 0.4 Data Model Improvements
 
@@ -216,21 +178,16 @@ These issues should be resolved before implementing orders/payments to avoid pro
 
 *Open (blocking Phase 1 completion):*
 - [x] **#4** HTTP status codes — DELETE returns 200 with deleted item in body (user preference)
-  - Previously targeted 204 No Content, but user prefers 200 with response body
 - [x] **#5** Error logging — fixed; no `fmt.Errorf(...).Error()` pattern found
-- [x] **#6** Input validation — fixed; `go-playground/validator/v10` used in handlers
-- [ ] **#10** Remove request body logging (security issue — may contain PII/secrets)
-  - REST: `product_handler.go:39-42` (CreateProduct), `120-123` (UpdateProduct)
-  - GraphQL: `main.go:87` (debug body log)
-  - Pattern: `logger.Debug("raw body", zap.String("body", ...))` — remove or gate with strict env check
-- [ ] **#11** Import `strings` only used for body logging — remove when #10 is fixed
-  - `product_handler.go:11` — `strings.ReplaceAll` appears only in debug logs
-- [x] **#12** Lowercase SQL consistently — fixed; all queries now lowercase
+- [x] **#6** Input validation — `go-playground/validator/v10` wired; caveat: `required` tag on Price/Stock rejects zero-values (see `TODO(#6-validation)`)
+- [ ] **#10** Remove request body logging (security issue — may contain PII/secrets) — see `TODO(#10)` in code
+- [ ] **#11** Import `strings` only used for body logging — remove when #10 is fixed — see `TODO(#11)` in code
+- [ ] **#12** Lowercase SQL — partially done; `Create` and `UpdateByID` still uppercase — see `TODO(#12)` in code
 
 *Open (infrastructure — can defer to Phase 1 cleanup):*
 - [x] **#7** Use `time.Time` — fixed; models use `time.Time` for timestamps
-- [x] **#8** Load `.env` — user preference; current approach works. godotenv.Load() is idempotent. Cleanest is to load once in main() then use os.Getenv().
-- [x] **#9** Configure DB connection pool — fixed; pool settings configured in `utils/utils.go:66-73`
+- [x] **#8** Load `.env` — fixed; loaded once in `main()`, `GetEnvVar` is just `os.Getenv()`
+- [x] **#9** Configure DB connection pool — fixed; pool settings configurable via env vars in `utils/utils.go`
 
 *Future (not blocking Phase 1):*
 - [ ] **#16** No interfaces for HTTP handlers — consider for testing (minor priority)
@@ -270,10 +227,21 @@ These issues should be resolved before implementing orders/payments to avoid pro
 **ID generation**:
 - [ ] Change `prod_id` from INT8 to STRING in database schema
 - [x] Update `models.Product` — `ProductID` already has `string` JSON tag; added `TTLExpires` field
-- [x] Update `ProductRepo` interface and `pgProductRepo` — methods take/return `string` IDs
-- [x] Update `ProductService` interface and implementation — methods take/return `string` IDs
-- [x] Update REST handlers — remove `strconv.ParseInt`, use path value directly as string
-- [x] Update GraphQL resolvers — type-assert `id` as `string` instead of converting to `int64`
+- [ ] Update `ProductRepo` interface and `pgProductRepo` — methods take/return `string` IDs
+  - `FetchByID` ✅ takes string
+  - `DeleteByID` ❌ still takes `int64` — see `TODO(id-migration)` in `product_repo.go`
+  - `UpdateByID` ❌ receives `*int64` via `UpdateProductReq.ProductID`
+- [ ] Update `ProductService` interface and implementation — methods take/return `string` IDs
+  - `GetProductByID` ✅ takes string
+  - `DeleteProduct` ❌ still takes `int64` — see `TODO(id-migration)` in `product_service.go`
+- [ ] Update REST handlers — remove `strconv.ParseInt`, use path value directly as string
+  - `FetchProduct` ✅ passes string directly
+  - `DeleteProduct` ❌ still uses `strconv.ParseInt` — see `TODO(id-migration)` in `product_handler.go`
+- [ ] Update GraphQL resolvers — type-assert `id` as `string` instead of converting to `int64`
+  - `GetProductByID` ✅ uses string
+  - `UpdateProduct` ❌ converts to `int64` — see `TODO(id-migration)` in `resolvers.go`
+  - `DeleteProduct` ❌ converts to `int64` — see `TODO(id-migration)` in `resolvers.go`
+  - `UpdateProductInput.prod_id` ❌ is `graphql.Int` — see `TODO(id-migration)` in `types.go`
 - [x] Generate `PR-XXXXXX` ID in service layer on create (6-char random alphanumeric after prefix)
   - Use `crypto/rand` or `math/rand` with seed for ID generation
   - Example: `PR-A1B2C3`, `PR-9XYZ42`

@@ -65,6 +65,8 @@ func (r *Resolver) UpdateProduct(p graphql.ResolveParams) (interface{}, error) {
 		return nil, nil
 	}
 
+	// TODO(id-migration): Stop converting to int64. Once UpdateProductReq.ProductID
+	// is *string, just type-assert as string: prodIDStr := prodIDRaw.(string)
 	var prodID int64
 	switch v := prodIDRaw.(type) {
 	case int:
@@ -121,6 +123,9 @@ func (r *Resolver) DeleteProduct(p graphql.ResolveParams) (interface{}, error) {
 		return nil, nil
 	}
 
+	// TODO(id-migration): Stop converting to int64. Once DeleteProduct takes string,
+	// just type-assert as string: productID := prodIDRaw.(string)
+	// Also remove the "strconv" import when this is done.
 	var productID int64
 	switch v := prodIDRaw.(type) {
 	case int:

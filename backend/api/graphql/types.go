@@ -19,6 +19,8 @@ var ProductType = graphql.NewObject(graphql.ObjectConfig{
 var UpdateProductInput = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "UpdateProductInput",
 	Fields: graphql.InputObjectConfigFieldMap{
+		// TODO(id-migration): Type should be graphql.String (not Int) to match
+		// PR-XXXXXX string IDs. Also update the resolver to stop converting to int64.
 		"prod_id": &graphql.InputObjectFieldConfig{
 			Type:        graphql.NewNonNull(graphql.Int),
 			Description: "The ID of the product to update",

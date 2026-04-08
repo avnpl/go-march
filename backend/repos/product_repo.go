@@ -27,6 +27,8 @@ func NewPGProductRepo(db *sqlx.DB) ProductRepo {
 }
 
 func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
+	// TODO(#12): Uppercase SQL keywords — normalize to lowercase for consistency
+	// e.g. "insert into products (...) values (...) returning *"
 	const query = "INSERT INTO products (prod_id, prod_name, price, stock) VALUES ($1, $2, $3, $4) RETURNING *"
 
 	var res models.Product
@@ -59,6 +61,8 @@ func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
 }
 
 func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error) {
+	// TODO(#12): Uppercase SQL keywords here and in the WHERE/RETURNING clause below
+	// — normalize to lowercase like FetchByID/FetchAll/DeleteByID already are
 	query := "UPDATE products SET "
 	args := make(map[string]interface{})
 	var fieldsToUpdate []string
@@ -102,6 +106,9 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	return res, nil
 }
 
+// TODO(id-migration): DeleteByID still takes int64 — must change to string
+// to match the PR-XXXXXX ID format used by Create and FetchByID.
+// Products created with string IDs cannot be deleted through this path.
 func (r pgProductRepo) DeleteByID(ctx context.Context, id int64) (models.Product, error) {
 	const query = "delete from products where prod_id = $1 returning *"
 
