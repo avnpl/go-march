@@ -1,23 +1,26 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"time"
+)
 
 type Product struct {
 	ProductID  string       `db:"prod_id" json:"prod_id"`
 	Name       string       `db:"prod_name" json:"prod_name"`
 	Price      float64      `db:"price" json:"price"`
 	Stock      int          `db:"stock" json:"stock"`
-	CreatedAt  string       `db:"created_at" json:"created_at"`
-	UpdatedAt  string       `db:"updated_at" json:"updated_at"`
+	CreatedAt  time.Time    `db:"created_at" json:"created_at"`
+	UpdatedAt  time.Time    `db:"updated_at" json:"updated_at"`
 	TTLExpires sql.NullTime `db:"ttl_expires_at" json:"-"`
 }
 
 type Orders struct {
-	OrderID   string `db:"order_id"`
-	Quantity  int    `db:"quantity"`
-	ProductID string `db:"product_id"`
-	Amount    string `db:"total_price"`
-	CreatedAt string `db:"order_time"`
+	OrderID   string    `db:"order_id"`
+	Quantity  int       `db:"quantity"`
+	ProductID string    `db:"product_id"`
+	Amount    float64   `db:"total_price"`
+	CreatedAt time.Time `db:"order_time"`
 }
 
 type CreateProductReq struct {

@@ -215,42 +215,22 @@ These issues should be resolved before implementing orders/payments to avoid pro
 - [x] **#15** Sentinel errors use standard library `errors` (`utils/errors.go`) — no `pkg/errors` dependency
 
 *Open (blocking Phase 1 completion):*
-- [ ] **#4** HTTP status codes — GET and PATCH use 200; **DELETE should be 204** without a body
-  - Currently: `DeleteProduct` returns 200 + JSON body
-  - Target: 204 No Content with empty body
-  - Impact: REST semantics compliance
-- [ ] **#5** Error logging — replace remaining `fmt.Errorf(...).Error()` as log message with message + `zap.Error(err)`
-  - Locations: `product_handler.go:32, 46, 68, 94, 106, 120`
-  - Line 94 is worst: `fmt.Errorf("FetchAllProducts failed")` without `err` — loses error entirely
-  - Pattern: `h.log.Error(fmt.Errorf("...%w", err).Error(), zap.Error(err))` → `h.log.Error("message", zap.Error(err))`
-- [x] **#6** Input validation — name required, price > 0, stock >= 0
-  - Current: `validate:"required"` tags on `CreateProductReq` are inert — no validator reads them
-  - Options: manual checks in handler/service, or add `github.com/go-playground/validator/v10`
-  - Affects: `CreateProduct` and `UpdateProduct` handlers
+- [x] **#4** HTTP status codes — DELETE returns 200 with deleted item in body (user preference)
+  - Previously targeted 204 No Content, but user prefers 200 with response body
+- [x] **#5** Error logging — fixed; no `fmt.Errorf(...).Error()` pattern found
+- [x] **#6** Input validation — fixed; `go-playground/validator/v10` used in handlers
 - [ ] **#10** Remove request body logging (security issue — may contain PII/secrets)
-  - REST: `product_handler.go:38-41` (CreateProduct), `112-115` (UpdateProduct)
-  - GraphQL: `main.go:84` (debug body log)
+  - REST: `product_handler.go:39-42` (CreateProduct), `120-123` (UpdateProduct)
+  - GraphQL: `main.go:87` (debug body log)
   - Pattern: `logger.Debug("raw body", zap.String("body", ...))` — remove or gate with strict env check
 - [ ] **#11** Import `strings` only used for body logging — remove when #10 is fixed
-  - `product_handler.go:12` — `strings.ReplaceAll` appears only in debug logs
-- [ ] **#12** Lowercase SQL consistently in `product_repo.go`
-  - Line 40: `"SELECT * FROM PRODUCTS WHERE PROD_ID = $1"` (UPPERCASE)
-  - Line 51: `"SELECT * FROM PRODUCTS"` (UPPERCASE)
-  - Line 106: `"DELETE FROM products where PROD_ID = $1 RETURNING *"` (mixed case!)
-  - Target: all lowercase keywords and identifiers
+  - `product_handler.go:11` — `strings.ReplaceAll` appears only in debug logs
+- [x] **#12** Lowercase SQL consistently — fixed; all queries now lowercase
 
 *Open (infrastructure — can defer to Phase 1 cleanup):*
-- [ ] **#7** Use `time.Time` (or DB TIMESTAMPTZ) instead of `string` for timestamps in models
-  - Affects: `models.Product.CreatedAt`, `UpdatedAt`; `models.Orders.CreatedAt`
-  - Impact: type safety, JSON serialization, time operations
-  - Requires: model changes + repo query updates
-- [ ] **#8** Load `.env` once at startup, not on every `getEnvVar` call
-  - Current: `utils/utils.go:16` — `godotenv.Load(".env")` inside `getEnvVar` (file I/O on every call)
-  - Fix: load once in `main()` or `init()`
-- [ ] **#9** Configure DB connection pool (max open, idle, conn lifetime)
-  - Current: `utils/utils.go:54-64` — no pool config after `sqlx.Connect`
-  - Add: `db.SetMaxOpenConns(25)`, `SetMaxIdleConns(10)`, `SetConnMaxLifetime(5*time.Minute)`
-  - Add: `db.Ping()` to verify connection
+- [x] **#7** Use `time.Time` — fixed; models use `time.Time` for timestamps
+- [x] **#8** Load `.env` — user preference; current approach works. godotenv.Load() is idempotent. Cleanest is to load once in main() then use os.Getenv().
+- [x] **#9** Configure DB connection pool — fixed; pool settings configured in `utils/utils.go:66-73`
 
 *Future (not blocking Phase 1):*
 - [ ] **#16** No interfaces for HTTP handlers — consider for testing (minor priority)
@@ -275,9 +255,9 @@ These issues should be resolved before implementing orders/payments to avoid pro
   - Don't log read operations (get/list) unless they fail
   - Document this policy in CLAUDE.md
 - [x] **L6** Fix error response inconsistency in `UpdateProduct` handler
-  - Location: `product_handler.go:134` — `http.Error(w, err.Error(), http.StatusConflict)`
-  - Issue: exposes internal error messages to client
-  - Fix: use `utilErrs.SendJSONError(w, http.StatusConflict, "")` like other handlers
+  - Location: `product_handler.go:143` — was `http.Error(w, err.Error(), http.StatusConflict)`
+  - Issue: exposed internal error messages to client
+  - Fix: changed to `utils.SendJSONError(w, http.StatusConflict, "")`
 - [ ] **L7** Standardize debug field naming
   - Remove spaces from field names (`"request param"` → `"id"`)
   - Remove trailing punctuation from messages (`"received ID => "` → `"received request"`)

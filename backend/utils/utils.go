@@ -6,21 +6,28 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func getEnvVar(key string) string {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatalln("Error loading .env file...")
-	}
+func GetEnvVar(key string) string {
 	return os.Getenv(key)
+}
+
+func GetEnvVarInteger(key string, defaultValue int, logger *zap.Logger) int {
+	value := GetEnvVar(key)
+
+	res, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		logger.Error("Error converting env variable to int")
+		res = int64(defaultValue)
+	}
+	return int(res)
 }
 
 func BuildLogger() *zap.Logger {
@@ -55,7 +62,7 @@ func BuildLogger() *zap.Logger {
 }
 
 func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
-	dsn := getEnvVar("DB_URL")
+	dsn := GetEnvVar("DB_URL")
 	if dsn == "" {
 		logger.Fatal("DB_URL not set")
 	}
@@ -64,9 +71,10 @@ func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
 		logger.Fatal("db connect failed", zap.Error(err))
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(10)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	lifetime := GetEnvVarInteger("DB_MAX_CONN_LIFETIME_SEC", 10, logger)
+	db.SetMaxOpenConns(GetEnvVarInteger("DB_MAX_OPEN_CONNS", 25, logger))
+	db.SetMaxIdleConns(GetEnvVarInteger("DB_MAX_IDLE_CONNS", 10, logger))
+	db.SetConnMaxLifetime(time.Duration(lifetime) * time.Second)
 	if err := db.Ping(); err != nil {
 		logger.Fatal("db ping failed", zap.Error(err))
 	}

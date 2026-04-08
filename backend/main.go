@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +16,7 @@ import (
 	"github.com/avnpl/go-march/api/rest"
 	"github.com/go-playground/validator/v10"
 	"github.com/graphql-go/graphql"
+	"github.com/joho/godotenv"
 
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/services"
@@ -25,6 +27,11 @@ import (
 )
 
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalln("Error loading .env file...")
+	}
+
 	logger := utils.BuildLogger()
 	defer logger.Sync()
 
@@ -112,8 +119,10 @@ func main() {
 		_ = json.NewEncoder(w).Encode(result)
 	})
 
+	port := utils.GetEnvVar("PORT")
+
 	srv := &http.Server{
-		Addr:         ":8080",
+		Addr:         port,
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -122,7 +131,7 @@ func main() {
 
 	// Start the server in a separate GR
 	go func() {
-		logger.Info("listening on :8080")
+		logger.Info("listening on " + port)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("serve error", zap.Error(err))
 		}
