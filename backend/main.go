@@ -91,7 +91,6 @@ func main() {
 			utils.SendInternalError(w)
 			return
 		}
-		// TODO(#10): Remove GraphQL body logging — same security concern as REST handlers
 		logger.Debug("graphql body", zap.String("body", string(bodyBytes)))
 
 		var params struct {

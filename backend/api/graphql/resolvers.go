@@ -60,37 +60,25 @@ func (r *Resolver) UpdateProduct(p graphql.ResolveParams) (interface{}, error) {
 		return nil, nil
 	}
 
-	prodIDRaw, ok := input["prod_id"]
+	prodID, ok := input["prod_id"].(string)
 	if !ok {
 		return nil, nil
 	}
 
-	// TODO(id-migration): Stop converting to int64. Once UpdateProductReq.ProductID
-	// is *string, just type-assert as string: prodIDStr := prodIDRaw.(string)
-	var prodID int64
-	switch v := prodIDRaw.(type) {
-	case int:
-		prodID = int64(v)
-	case int64:
-		prodID = v
-	default:
-		return nil, nil
-	}
-
 	req := &models.UpdateProductReq{
-		ProductID: &prodID,
+		ProductID: prodID,
 	}
 
 	if name, ok := input["name"].(string); ok && name != "" {
-		req.Name = &name
+		req.Name = name
 	}
 
 	if price, ok := input["price"].(float64); ok {
-		req.Price = &price
+		req.Price = price
 	}
 
 	if stock, ok := input["stock"].(int); ok {
-		req.Stock = &stock
+		req.Stock = stock
 	}
 
 	ctx := p.Context

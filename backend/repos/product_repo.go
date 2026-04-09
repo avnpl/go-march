@@ -68,17 +68,17 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	var fieldsToUpdate []string
 	var res models.Product
 
-	if p.Name != nil && *p.Name != "" {
+	if p.Name != "" {
 		fieldsToUpdate = append(fieldsToUpdate, "prod_name = :prod_name")
 		args["prod_name"] = p.Name
 	}
 
-	if p.Stock != nil && *p.Stock != 0 {
+	if p.Stock != 0 {
 		fieldsToUpdate = append(fieldsToUpdate, "stock = :stock")
 		args["stock"] = p.Stock
 	}
 
-	if p.Price != nil && *p.Price != 0 {
+	if p.Price != 0.0 {
 		fieldsToUpdate = append(fieldsToUpdate, "price = :price")
 		args["price"] = p.Price
 	}
