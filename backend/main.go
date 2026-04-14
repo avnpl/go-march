@@ -119,7 +119,7 @@ func main() {
 		_ = json.NewEncoder(w).Encode(result)
 	})
 
-	port := utils.GetEnvVar("PORT")
+	port := utils.GetEnvVarString("PORT", ":8013", logger)
 
 	srv := &http.Server{
 		Addr:         port,

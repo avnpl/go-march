@@ -15,12 +15,22 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func GetEnvVar(key string) string {
+func getEnvVar(key string) string {
 	return os.Getenv(key)
 }
 
+func GetEnvVarString(key string, defaultValue string, logger *zap.Logger) string {
+	value := getEnvVar(key)
+
+	if value == "" {
+		logger.Warn("Variable not set in env")
+		return defaultValue
+	}
+	return value
+}
+
 func GetEnvVarInteger(key string, defaultValue int, logger *zap.Logger) int {
-	value := GetEnvVar(key)
+	value := getEnvVar(key)
 
 	res, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
@@ -62,7 +72,7 @@ func BuildLogger() *zap.Logger {
 }
 
 func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
-	dsn := GetEnvVar("DB_URL")
+	dsn := getEnvVar("DB_URL")
 	if dsn == "" {
 		logger.Fatal("DB_URL not set")
 	}
