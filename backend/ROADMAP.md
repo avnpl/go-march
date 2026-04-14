@@ -26,8 +26,8 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 | Phase | Status | Completion |
 |-------|--------|------------|
-| **Phase 0** | 🔶 In Progress | 11/16 review issues fixed; 5 remaining: #6 caveat, #10, #11, #12 partial, #16 deferred. Plus ID migration incomplete across Update/Delete paths. |
-| **Phase 1.1** | 🔶 Partial | Product CRUD functional; paths differ from target (`/product` vs `/products/{id}`); ID migration half-done (Create/Fetch use string, Update/Delete still int64) |
+| **Phase 0** | 🔶 In Progress | 11/16 review issues fixed; 5 remaining: #6 caveat, #10, #11, #12 partial, #16 deferred. ID migration now complete across all paths. |
+| **Phase 1.1** | 🔶 Partial | Product CRUD functional; paths differ from target (`/product` vs `/products/{id}`); ID migration complete (all operations now use string IDs) |
 | **Phase 1.2-1.4** | ⬜ Not Started | Orders, payments, payment simulation not implemented |
 | **Phase 2** | 🔶 Minimal | GraphQL has product queries/mutations only; no orders (target: Phase 2) |
 | **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket are stub packages |
@@ -227,21 +227,21 @@ These issues should be resolved before implementing orders/payments to avoid pro
 **ID generation**:
 - [ ] Change `prod_id` from INT8 to STRING in database schema
 - [x] Update `models.Product` — `ProductID` already has `string` JSON tag; added `TTLExpires` field
-- [ ] Update `ProductRepo` interface and `pgProductRepo` — methods take/return `string` IDs
+- [x] Update `ProductRepo` interface and `pgProductRepo` — methods take/return `string` IDs
   - `FetchByID` ✅ takes string
-  - `DeleteByID` ❌ still takes `int64` — see `TODO(id-migration)` in `product_repo.go`
-  - `UpdateByID` ❌ receives `*int64` via `UpdateProductReq.ProductID`
-- [ ] Update `ProductService` interface and implementation — methods take/return `string` IDs
+  - `DeleteByID` ✅ takes string
+  - `UpdateByID` ✅ takes string via `UpdateProductReq.ProductID`
+- [x] Update `ProductService` interface and implementation — methods take/return `string` IDs
   - `GetProductByID` ✅ takes string
-  - `DeleteProduct` ❌ still takes `int64` — see `TODO(id-migration)` in `product_service.go`
-- [ ] Update REST handlers — remove `strconv.ParseInt`, use path value directly as string
+  - `DeleteProduct` ✅ takes string
+- [x] Update REST handlers — remove `strconv.ParseInt`, use path value directly as string
   - `FetchProduct` ✅ passes string directly
-  - `DeleteProduct` ❌ still uses `strconv.ParseInt` — see `TODO(id-migration)` in `product_handler.go`
-- [ ] Update GraphQL resolvers — type-assert `id` as `string` instead of converting to `int64`
+  - `DeleteProduct` ✅ passes string directly
+- [x] Update GraphQL resolvers — type-assert `id` as `string` instead of converting to `int64`
   - `GetProductByID` ✅ uses string
-  - `UpdateProduct` ❌ converts to `int64` — see `TODO(id-migration)` in `resolvers.go`
-  - `DeleteProduct` ❌ converts to `int64` — see `TODO(id-migration)` in `resolvers.go`
-  - `UpdateProductInput.prod_id` ❌ is `graphql.Int` — see `TODO(id-migration)` in `types.go`
+  - `UpdateProduct` ✅ uses string
+  - `DeleteProduct` ✅ uses string
+  - `UpdateProductInput.prod_id` ✅ is `graphql.String`
 - [x] Generate `PR-XXXXXX` ID in service layer on create (6-char random alphanumeric after prefix)
   - Use `crypto/rand` or `math/rand` with seed for ID generation
   - Example: `PR-A1B2C3`, `PR-9XYZ42`

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings" // TODO(#11): Only used for body logging — remove when #10 is fixed
 
 	"github.com/avnpl/go-march/models"
@@ -166,16 +165,7 @@ func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	h.log.Debug("received ID => ", zap.String("request param", idStr))
 
-	// TODO(id-migration): Remove strconv.ParseInt — pass idStr directly as string
-	// once service.DeleteProduct and repo.DeleteByID accept string IDs.
-	// Currently breaks for PR-XXXXXX IDs (ParseInt always fails on them).
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		h.log.Error("DeleteProduct failed", zap.Error(err))
-		utils.SendJSONError(w, http.StatusBadRequest, "Invalid ID format")
-		return
-	}
-	prod, err := h.svc.DeleteProduct(r.Context(), id)
+	prod, err := h.svc.DeleteProduct(r.Context(), idStr)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			utils.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")

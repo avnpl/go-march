@@ -15,7 +15,7 @@ type ProductRepo interface {
 	FetchByID(ctx context.Context, id string) (models.Product, error)
 	FetchAll(ctx context.Context) ([]models.Product, error)
 	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
-	DeleteByID(ctx context.Context, id int64) (models.Product, error)
+	DeleteByID(ctx context.Context, id string) (models.Product, error)
 }
 
 type pgProductRepo struct {
@@ -106,10 +106,7 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	return res, nil
 }
 
-// TODO(id-migration): DeleteByID still takes int64 — must change to string
-// to match the PR-XXXXXX ID format used by Create and FetchByID.
-// Products created with string IDs cannot be deleted through this path.
-func (r pgProductRepo) DeleteByID(ctx context.Context, id int64) (models.Product, error) {
+func (r pgProductRepo) DeleteByID(ctx context.Context, id string) (models.Product, error) {
 	const query = "delete from products where prod_id = $1 returning *"
 
 	var result models.Product

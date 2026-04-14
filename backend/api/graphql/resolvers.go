@@ -2,7 +2,6 @@ package graphql
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
@@ -106,23 +105,8 @@ func (r *Resolver) DeleteProduct(p graphql.ResolveParams) (interface{}, error) {
 		return nil, nil
 	}
 
-	prodIDRaw, ok := input["prod_id"]
+	productID, ok := input["prod_id"].(string)
 	if !ok {
-		return nil, nil
-	}
-
-	// TODO(id-migration): Stop converting to int64. Once DeleteProduct takes string,
-	// just type-assert as string: productID := prodIDRaw.(string)
-	// Also remove the "strconv" import when this is done.
-	var productID int64
-	switch v := prodIDRaw.(type) {
-	case int:
-		productID = int64(v)
-	case int64:
-		productID = v
-	case string:
-		productID, _ = strconv.ParseInt(prodIDRaw.(string), 10, 64)
-	default:
 		return nil, nil
 	}
 

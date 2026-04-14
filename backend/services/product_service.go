@@ -15,8 +15,7 @@ type ProductService interface {
 	GetProductByID(ctx context.Context, id string) (models.Product, error)
 	GetAllProducts(ctx context.Context) ([]models.Product, error)
 	UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error)
-	// TODO(id-migration): DeleteProduct still takes int64 — change to string
-	DeleteProduct(ctx context.Context, id int64) (models.Product, error)
+	DeleteProduct(ctx context.Context, id string) (models.Product, error)
 }
 
 type productService struct {
@@ -72,8 +71,7 @@ func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdatePr
 	return res, nil
 }
 
-// TODO(id-migration): Change id param from int64 to string (and update repo.DeleteByID)
-func (s *productService) DeleteProduct(ctx context.Context, id int64) (models.Product, error) {
+func (s *productService) DeleteProduct(ctx context.Context, id string) (models.Product, error) {
 	res, err := s.repo.DeleteByID(ctx, id)
 	if err != nil {
 		return models.Product{}, fmt.Errorf("prod_service.Delete: %w", err)
