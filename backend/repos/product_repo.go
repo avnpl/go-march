@@ -27,9 +27,7 @@ func NewPGProductRepo(db *sqlx.DB) ProductRepo {
 }
 
 func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
-	// TODO(#12): Uppercase SQL keywords — normalize to lowercase for consistency
-	// e.g. "insert into products (...) values (...) returning *"
-	const query = "INSERT INTO products (prod_id, prod_name, price, stock) VALUES ($1, $2, $3, $4) RETURNING *"
+	const query = "insert into products (prod_id, prod_name, price, stock) values ($1, $2, $3, $4) returning *"
 
 	var res models.Product
 	if err := r.db.GetContext(ctx, &res, query, p.ProductID, p.Name, p.Price, p.Stock); err != nil {
@@ -61,9 +59,7 @@ func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
 }
 
 func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error) {
-	// TODO(#12): Uppercase SQL keywords here and in the WHERE/RETURNING clause below
-	// — normalize to lowercase like FetchByID/FetchAll/DeleteByID already are
-	query := "UPDATE products SET "
+	query := "update products set "
 	args := make(map[string]interface{})
 	var fieldsToUpdate []string
 	var res models.Product

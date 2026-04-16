@@ -7,7 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings" // TODO(#11): Only used for body logging — remove when #10 is fixed
+	"strings"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
@@ -34,9 +34,6 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(#10): Remove request body logging — security risk, may contain PII/secrets.
-	// Remove the 4 lines below (reqString through the Debug call).
-	// When removed, also remove the "strings" import (#11) and "bytes" if unused.
 	reqString := string(bodyBytes)
 	h.log.Debug("raw body",
 		zap.Int("length", len(bodyBytes)),
@@ -118,7 +115,6 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(#10): Same body logging issue as CreateProduct above — remove these lines.
 	reqString := string(bodyBytes)
 	h.log.Debug("raw body",
 		zap.Int("length", len(bodyBytes)),

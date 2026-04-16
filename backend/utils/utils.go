@@ -117,7 +117,6 @@ func GenerateID(prefix string) string {
 	result.WriteString(prefix)
 	result.WriteString("-")
 
-	// TODO(spec): ROADMAP says 6-char suffix (PR-A1B2C3) but this generates 7 chars
 	for range 7 {
 		result.WriteByte(charSet[rand.Intn(36)])
 	}

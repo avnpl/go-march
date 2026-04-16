@@ -94,11 +94,7 @@ These issues should be resolved before implementing orders/payments to avoid pro
 **Priority: High** — affects API contract and security
 
 - [x] **DELETE semantics** — user preference: returns 200 with deleted item in body (review #4)
-- [ ] **Request body logging** — remove or strictly gate (review #10, #11)
-  - Security: request bodies may contain PII, passwords, tokens, credit cards
-  - Remove `product_handler.go:38-41, 112-115` debug body logs
-  - Remove `main.go:84` GraphQL body log (or gate with `if os.Getenv("LOG_REQUEST_BODIES") == "true"`)
-  - Remove unused `strings` import after cleanup (review #11)
+- [x] **Request body logging** — kept per user preference; request bodies logged for debugging (review #10, #11)
 - [x] **Error logging pattern** — fixed; all handlers use static message + `zap.Error(err)` (review #5)
 - [x] **Error response consistency** — fixed; uses `utils.SendJSONError` (logging improvement L6)
 
@@ -108,8 +104,8 @@ These issues should be resolved before implementing orders/payments to avoid pro
 
 - [x] **Implement validation** for `CreateProductReq` (review #6)
   - Used Option B: `go-playground/validator/v10` with struct tags
-  - **Caveat**: `validate:"required"` on `Price` (float64) and `Stock` (int) rejects zero-values. Fix: use `gt=0` for Price, `min=0` for Stock. See `TODO(#6-validation)` in `models/models.go`.
-- [x] **Implement validation** for `UpdateProductReq` — validator wired in handler
+  - Uses `gt=0` for Price (must be > 0) and `min=0` for Stock (must be >= 0)
+- [x] **Implement validation** for `UpdateProductReq` — validator wired in handler, uses `omitempty,gt=0` and `omitempty,min=0`
 - [x] **Remove or document** inert `validate` tags — tags are now active via `validator/v10`
 
 ## 0.3 Infrastructure Hardening
@@ -128,9 +124,7 @@ These issues should be resolved before implementing orders/payments to avoid pro
     }
     ```
   - Consider making these configurable via env vars
-- [ ] **SQL consistency** — partially done (review #12)
-  - `FetchByID`, `FetchAll`, `DeleteByID` are lowercase ✅
-  - `Create` and `UpdateByID` still use uppercase keywords (`INSERT INTO`, `UPDATE`, `SET`, `WHERE`, `RETURNING`) — see `TODO(#12)` in `product_repo.go`
+- [x] **SQL consistency** — all queries use lowercase keywords (review #12)
 
 ## 0.4 Data Model Improvements
 
