@@ -11,7 +11,6 @@
 Each API style demonstrates its strengths. No duplication of CRUD across APIs.
 
 ```
-Phase 0   Critical Fixes ──────────────── resolve review findings before new features
 Phase 1   REST Completion ────────────── complete end-to-end flow (products + orders + payments)
 Phase 2   GraphQL Enhancement ─────────── orders + nested products
 Phase 3   SOAP Implementation ────────── payment transactions
@@ -20,18 +19,17 @@ Phase 5   WebSocket Real-time ──────────── notifications
 Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 ```
 
-**Current status**: Phase 0 complete (14/16 fixed). ID migration done. Body logging kept per user preference. Phase 1 orders/payments not started.
+**Current status**: Product CRUD functional. Orders/payments not started.
 
 ## Progress Summary
 
-| Phase | Status | Completion |
-|-------|--------|------------|
-| **Phase 0** | ✅ Complete | 14/16 review issues fixed; #10/#11 kept per user preference; #16 future. ID migration complete. |
-| **Phase 1.1** | 🔶 Partial | Product CRUD functional; paths differ from target (`/product` vs `/products/{id}`); ID migration complete (all operations now use string IDs) |
-| **Phase 1.2-1.4** | ⬜ Not Started | Orders, payments, payment simulation not implemented |
-| **Phase 2** | 🔶 Minimal | GraphQL has product queries/mutations only; no orders (target: Phase 2) |
-| **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket are stub packages |
-| **Phase 6** | ⬜ Not Started | TTL, reset mechanism, comprehensive README |
+| Phase | Status | Notes |
+|-------|--------|-------|
+| **Phase 1.1** | 🔶 Partial | Product CRUD; paths differ from target (`/product` vs `/products/{id}`) |
+| **Phase 1.2-1.4** | ⬜ Not Started | Orders, payments, payment simulation |
+| **Phase 2** | 🔶 Minimal | GraphQL has products only |
+| **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket stubs |
+| **Phase 6** | ⬜ Not Started | TTL, README |
 
 **Legend**: ✅ Complete | 🔶 In Progress | ⬜ Not Started
 
@@ -85,62 +83,6 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 ---
 
-# Phase 0: Critical Fixes (Before New Features)
-
-These issues should be resolved before implementing orders/payments to avoid propagating anti-patterns.
-
-## 0.1 REST Handler Cleanup
-
-**Priority: High** — affects API contract and security
-
-- [x] **DELETE semantics** — user preference: returns 200 with deleted item in body (review #4)
-- [x] **Request body logging** — kept per user preference; request bodies logged for debugging (review #10, #11)
-- [x] **Error logging pattern** — fixed; all handlers use static message + `zap.Error(err)` (review #5)
-- [x] **Error response consistency** — fixed; uses `utils.SendJSONError` (logging improvement L6)
-
-## 0.2 Input Validation
-
-**Priority: High** — prevents invalid data in database
-
-- [x] **Implement validation** for `CreateProductReq` (review #6)
-  - Used Option B: `go-playground/validator/v10` with struct tags
-  - Uses `gt=0` for Price (must be > 0) and `min=0` for Stock (must be >= 0)
-- [x] **Implement validation** for `UpdateProductReq` — validator wired in handler, uses `omitempty,gt=0` and `omitempty,min=0`
-- [x] **Remove or document** inert `validate` tags — tags are now active via `validator/v10`
-
-## 0.3 Infrastructure Hardening
-
-**Priority: Medium** — improves reliability and performance
-
-- [x] **Environment loading** — fixed; `.env` loaded once in `main()`, `GetEnvVar` is just `os.Getenv()` (review #8)
-- [x] **Database connection pool** — configure limits (review #9)
-  - Add after `sqlx.Connect` in `utils.GetDBPoolObject`:
-    ```go
-    db.SetMaxOpenConns(25)              // Max concurrent connections
-    db.SetMaxIdleConns(10)              // Keep this many idle
-    db.SetConnMaxLifetime(5 * time.Minute)  // Recycle connections
-    if err := db.Ping(); err != nil {
-        logger.Fatal("db ping failed", zap.Error(err))
-    }
-    ```
-  - Consider making these configurable via env vars
-- [x] **SQL consistency** — all queries use lowercase keywords (review #12)
-
-## 0.4 Data Model Improvements
-
-**Priority: Medium** — can be done alongside 0.1-0.3 or deferred to Phase 1 cleanup
-
-- [x] **Timestamp types** — use `time.Time` instead of `string` (review #7)
-  - Change `models.Product`: `CreatedAt time.Time`, `UpdatedAt time.Time`
-  - Change `models.Orders`: `CreatedAt time.Time` (field is `order_time` in DB)
-  - Update repo queries if needed (pgx/sqlx handle `time.Time` ↔ TIMESTAMPTZ automatically)
-  - JSON serialization: Go's `json.Marshal` converts `time.Time` to RFC3339 format automatically
-- [x] **Orders.Amount type** — change from `string` to `float64`
-  - Currently: `Amount string` with DB tag `total_price`
-  - Should be: `TotalPrice float64` (align field name with DB column or use explicit tag)
-
----
-
 # Phase 1: REST Completion
 
 ## 1.1 Complete Product CRUD
@@ -159,32 +101,6 @@ These issues should be resolved before implementing orders/payments to avoid pro
 - [ ] `PATCH /products/{id}` — update product
 - [ ] `DELETE /products/{id}` — delete product
 - [ ] `GET /products` — pagination (e.g. `limit` / `offset` or cursor) so list is never unbounded
-
-**Code review follow-ups** (see `agent-reviews/2026-03-12.md` for detailed explanations):
-
-*Fixed (commits c600527–3d8c6e0):*
-- [x] **#1** Context by value for `UpdateByID` (not `*context.Context`) — `repos/product_repo.go:61`
-- [x] **#2** GraphQL: handle invalid JSON and empty `query` — `main.go:81`
-- [x] **#3** ParseInt / invalid path ID returns 400 — `product_handler.go:75-76, 150-151`
-- [x] **#13** Use `errors.Is` for sentinel and `sql.ErrNoRows` in handlers — `product_handler.go:53, 79, 153`
-- [x] **#14** Close `*sqlx.Rows` in `UpdateByID` (`defer result.Close()`) — prevents connection leak
-- [x] **#15** Sentinel errors use standard library `errors` (`utils/errors.go`) — no `pkg/errors` dependency
-
-*Open (blocking Phase 1 completion):*
-- [x] **#4** HTTP status codes — DELETE returns 200 with deleted item in body (user preference)
-- [x] **#5** Error logging — fixed; no `fmt.Errorf(...).Error()` pattern found
-- [x] **#6** Input validation — fixed with gt=0/min=0 tags
-- [x] **#10** Request body logging — kept per user preference (intentional)
-- [x] **#11** Import strings — kept (needed for body logging)
-- [x] **#12** Lowercase SQL — all queries now lowercase
-
-*Open (infrastructure — can defer to Phase 1 cleanup):*
-- [x] **#7** Use `time.Time` — fixed; models use `time.Time` for timestamps
-- [x] **#8** Load `.env` — fixed; loaded once in `main()`, `GetEnvVar` is just `os.Getenv()`
-- [x] **#9** Configure DB connection pool — fixed; pool settings configurable via env vars in `utils/utils.go`
-
-*Future (not blocking Phase 1):*
-- [ ] **#16** No interfaces for HTTP handlers — consider for testing (minor priority)
 
 **Logging improvements** (deferred to Phase 6 or post-Phase 1 cleanup):
 - [ ] **L1** Make log level configurable via `LOG_LEVEL` env var (currently hardcoded to Debug in `utils.BuildLogger`)
@@ -220,26 +136,7 @@ These issues should be resolved before implementing orders/payments to avoid pro
 
 **ID generation**:
 - [ ] Change `prod_id` from INT8 to STRING in database schema
-- [x] Update `models.Product` — `ProductID` already has `string` JSON tag; added `TTLExpires` field
-- [x] Update `ProductRepo` interface and `pgProductRepo` — methods take/return `string` IDs
-  - `FetchByID` ✅ takes string
-  - `DeleteByID` ✅ takes string
-  - `UpdateByID` ✅ takes string via `UpdateProductReq.ProductID`
-- [x] Update `ProductService` interface and implementation — methods take/return `string` IDs
-  - `GetProductByID` ✅ takes string
-  - `DeleteProduct` ✅ takes string
-- [x] Update REST handlers — remove `strconv.ParseInt`, use path value directly as string
-  - `FetchProduct` ✅ passes string directly
-  - `DeleteProduct` ✅ passes string directly
-- [x] Update GraphQL resolvers — type-assert `id` as `string` instead of converting to `int64`
-  - `GetProductByID` ✅ uses string
-  - `UpdateProduct` ✅ uses string
-  - `DeleteProduct` ✅ uses string
-  - `UpdateProductInput.prod_id` ✅ is `graphql.String`
-- [x] Generate `PR-XXXXXX` ID in service layer on create (7-char random alphanumeric after prefix)
-  - Use `crypto/rand` or `math/rand` with seed for ID generation
-  - Example: `PR-A1B2C3D`, `PR-9XYZ42A`
-  - Ensure uniqueness (retry on conflict or use timestamp component)
+- [x] All code layers use string IDs (models, repo, service, handlers, GraphQL)
 
 ## 1.2 Complete Orders CRUD
 
