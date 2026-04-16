@@ -20,7 +20,7 @@ var UpdateProductInput = graphql.NewInputObject(graphql.InputObjectConfig{
 	Name: "UpdateProductInput",
 	Fields: graphql.InputObjectConfigFieldMap{
 		"prod_id": &graphql.InputObjectFieldConfig{
-			Type:        graphql.NewNonNull(graphql.Int),
+			Type:        graphql.NewNonNull(graphql.String),
 			Description: "The ID of the product to update",
 		},
 		"name": &graphql.InputObjectFieldConfig{

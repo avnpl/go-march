@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,7 +14,9 @@ import (
 
 	gql "github.com/avnpl/go-march/api/graphql"
 	"github.com/avnpl/go-march/api/rest"
+	"github.com/go-playground/validator/v10"
 	"github.com/graphql-go/graphql"
+	"github.com/joho/godotenv"
 
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/services"
@@ -23,16 +27,23 @@ import (
 )
 
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalln("Error loading .env file...")
+	}
+
 	logger := utils.BuildLogger()
 	defer logger.Sync()
 
 	db := utils.GetDBPoolObject(logger)
 	defer db.Close()
 
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
 	// Initialize the layers
 	productRepo := repos.NewPGProductRepo(db)
 	productService := services.NewProductService(productRepo, logger)
-	productHandler := rest.NewProductHandler(productService, logger)
+	productHandler := rest.NewProductHandler(productService, logger, validate)
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
@@ -75,11 +86,19 @@ func main() {
 			return
 		}
 
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			utils.SendInternalError(w)
+			return
+		}
+		logger.Debug("graphql body", zap.String("body", string(bodyBytes)))
+
 		var params struct {
 			Query string `json:"query"`
 		}
-		err := json.NewDecoder(r.Body).Decode(&params)
+		err = json.Unmarshal(bodyBytes, &params)
 		if err != nil {
+			logger.Error("failed to decode GraphQL request", zap.Error(err))
 			utils.SendJSONError(w, http.StatusBadRequest, "Invalid Request")
 			return
 		}
@@ -100,8 +119,10 @@ func main() {
 		_ = json.NewEncoder(w).Encode(result)
 	})
 
+	port := utils.GetEnvVarString("PORT", ":8013", logger)
+
 	srv := &http.Server{
-		Addr:         ":8080",
+		Addr:         port,
 		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -110,7 +131,7 @@ func main() {
 
 	// Start the server in a separate GR
 	go func() {
-		logger.Info("listening on :8080")
+		logger.Info("listening on " + port)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("serve error", zap.Error(err))
 		}

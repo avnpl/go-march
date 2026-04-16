@@ -6,15 +6,16 @@ import (
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/repos"
+	"github.com/avnpl/go-march/utils"
 	"go.uber.org/zap"
 )
 
 type ProductService interface {
 	CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error)
-	GetProductByID(ctx context.Context, id int64) (models.Product, error)
+	GetProductByID(ctx context.Context, id string) (models.Product, error)
 	GetAllProducts(ctx context.Context) ([]models.Product, error)
 	UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error)
-	DeleteProduct(ctx context.Context, id int64) (models.Product, error)
+	DeleteProduct(ctx context.Context, id string) (models.Product, error)
 }
 
 type productService struct {
@@ -28,9 +29,10 @@ func NewProductService(r repos.ProductRepo, l *zap.Logger) ProductService {
 
 func (s *productService) CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error) {
 	p := models.Product{
-		Name:  req.Name,
-		Price: req.Price,
-		Stock: req.Stock,
+		Name:      req.Name,
+		Price:     req.Price,
+		Stock:     req.Stock,
+		ProductID: utils.GenerateID("PR"),
 	}
 
 	res, err := s.repo.Create(ctx, &p)
@@ -42,7 +44,7 @@ func (s *productService) CreateProduct(ctx context.Context, req *models.CreatePr
 	return res, nil
 }
 
-func (s *productService) GetProductByID(ctx context.Context, id int64) (models.Product, error) {
+func (s *productService) GetProductByID(ctx context.Context, id string) (models.Product, error) {
 	var res models.Product
 	res, err := s.repo.FetchByID(ctx, id)
 	if err != nil {
@@ -69,7 +71,7 @@ func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdatePr
 	return res, nil
 }
 
-func (s *productService) DeleteProduct(ctx context.Context, id int64) (models.Product, error) {
+func (s *productService) DeleteProduct(ctx context.Context, id string) (models.Product, error) {
 	res, err := s.repo.DeleteByID(ctx, id)
 	if err != nil {
 		return models.Product{}, fmt.Errorf("prod_service.Delete: %w", err)
