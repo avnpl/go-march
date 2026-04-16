@@ -20,13 +20,13 @@ Phase 5   WebSocket Real-time ──────────── notifications
 Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 ```
 
-**Current status**: Phase 0 mostly done (11/16 fixed). Remaining blockers: ID migration incomplete (Update/Delete still int64), SQL case inconsistency, request body logging. Phase 1 orders/payments not started.
+**Current status**: Phase 0 complete (14/16 fixed). ID migration done. Body logging kept per user preference. Phase 1 orders/payments not started.
 
 ## Progress Summary
 
 | Phase | Status | Completion |
 |-------|--------|------------|
-| **Phase 0** | 🔶 In Progress | 11/16 review issues fixed; 5 remaining: #6 caveat, #10, #11, #12 partial, #16 deferred. ID migration now complete across all paths. |
+| **Phase 0** | ✅ Complete | 14/16 review issues fixed; #10/#11 kept per user preference; #16 future. ID migration complete. |
 | **Phase 1.1** | 🔶 Partial | Product CRUD functional; paths differ from target (`/product` vs `/products/{id}`); ID migration complete (all operations now use string IDs) |
 | **Phase 1.2-1.4** | ⬜ Not Started | Orders, payments, payment simulation not implemented |
 | **Phase 2** | 🔶 Minimal | GraphQL has product queries/mutations only; no orders (target: Phase 2) |
@@ -69,7 +69,7 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - `created_at` (timestamp)
 - `ttl_expires_at` (timestamp)
 
-> **Note**: ID is generated in the service layer. Format: `PR-` for products, `OR-` for orders, `PA-` for payments. Use short random string (6 chars) after prefix.
+> **Note**: ID is generated in the service layer. Format: `PR-` for products, `OR-` for orders, `PA-` for payments. Use short random string (7 chars) after prefix.
 
 ---
 
@@ -173,10 +173,10 @@ These issues should be resolved before implementing orders/payments to avoid pro
 *Open (blocking Phase 1 completion):*
 - [x] **#4** HTTP status codes — DELETE returns 200 with deleted item in body (user preference)
 - [x] **#5** Error logging — fixed; no `fmt.Errorf(...).Error()` pattern found
-- [x] **#6** Input validation — `go-playground/validator/v10` wired; caveat: `required` tag on Price/Stock rejects zero-values (see `TODO(#6-validation)`)
-- [ ] **#10** Remove request body logging (security issue — may contain PII/secrets) — see `TODO(#10)` in code
-- [ ] **#11** Import `strings` only used for body logging — remove when #10 is fixed — see `TODO(#11)` in code
-- [ ] **#12** Lowercase SQL — partially done; `Create` and `UpdateByID` still uppercase — see `TODO(#12)` in code
+- [x] **#6** Input validation — fixed with gt=0/min=0 tags
+- [x] **#10** Request body logging — kept per user preference (intentional)
+- [x] **#11** Import strings — kept (needed for body logging)
+- [x] **#12** Lowercase SQL — all queries now lowercase
 
 *Open (infrastructure — can defer to Phase 1 cleanup):*
 - [x] **#7** Use `time.Time` — fixed; models use `time.Time` for timestamps
@@ -236,9 +236,9 @@ These issues should be resolved before implementing orders/payments to avoid pro
   - `UpdateProduct` ✅ uses string
   - `DeleteProduct` ✅ uses string
   - `UpdateProductInput.prod_id` ✅ is `graphql.String`
-- [x] Generate `PR-XXXXXX` ID in service layer on create (6-char random alphanumeric after prefix)
+- [x] Generate `PR-XXXXXX` ID in service layer on create (7-char random alphanumeric after prefix)
   - Use `crypto/rand` or `math/rand` with seed for ID generation
-  - Example: `PR-A1B2C3`, `PR-9XYZ42`
+  - Example: `PR-A1B2C3D`, `PR-9XYZ42A`
   - Ensure uniqueness (retry on conflict or use timestamp component)
 
 ## 1.2 Complete Orders CRUD
