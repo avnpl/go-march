@@ -2,7 +2,6 @@ package graphql
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
@@ -26,17 +25,12 @@ func (r *Resolver) GetProductByID(p graphql.ResolveParams) (interface{}, error) 
 		return nil, nil
 	}
 
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx := p.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	product, err := r.productService.GetProductByID(ctx, id)
+	product, err := r.productService.GetProductByID(ctx, idStr)
 	if err != nil {
 		return nil, err
 	}
@@ -65,35 +59,25 @@ func (r *Resolver) UpdateProduct(p graphql.ResolveParams) (interface{}, error) {
 		return nil, nil
 	}
 
-	prodIDRaw, ok := input["prod_id"]
+	prodID, ok := input["prod_id"].(string)
 	if !ok {
 		return nil, nil
 	}
 
-	var prodID int64
-	switch v := prodIDRaw.(type) {
-	case int:
-		prodID = int64(v)
-	case int64:
-		prodID = v
-	default:
-		return nil, nil
-	}
-
 	req := &models.UpdateProductReq{
-		ProductID: &prodID,
+		ProductID: prodID,
 	}
 
 	if name, ok := input["name"].(string); ok && name != "" {
-		req.Name = &name
+		req.Name = name
 	}
 
 	if price, ok := input["price"].(float64); ok {
-		req.Price = &price
+		req.Price = price
 	}
 
 	if stock, ok := input["stock"].(int); ok {
-		req.Stock = &stock
+		req.Stock = stock
 	}
 
 	ctx := p.Context
@@ -121,20 +105,8 @@ func (r *Resolver) DeleteProduct(p graphql.ResolveParams) (interface{}, error) {
 		return nil, nil
 	}
 
-	prodIDRaw, ok := input["prod_id"]
+	productID, ok := input["prod_id"].(string)
 	if !ok {
-		return nil, nil
-	}
-
-	var productID int64
-	switch v := prodIDRaw.(type) {
-	case int:
-		productID = int64(v)
-	case int64:
-		productID = v
-	case string:
-		productID, _ = strconv.ParseInt(prodIDRaw.(string), 10, 64)
-	default:
 		return nil, nil
 	}
 

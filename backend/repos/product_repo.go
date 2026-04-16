@@ -12,10 +12,10 @@ import (
 
 type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) (models.Product, error)
-	FetchByID(ctx context.Context, id int64) (models.Product, error)
+	FetchByID(ctx context.Context, id string) (models.Product, error)
 	FetchAll(ctx context.Context) ([]models.Product, error)
 	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
-	DeleteByID(ctx context.Context, id int64) (models.Product, error)
+	DeleteByID(ctx context.Context, id string) (models.Product, error)
 }
 
 type pgProductRepo struct {
@@ -27,17 +27,17 @@ func NewPGProductRepo(db *sqlx.DB) ProductRepo {
 }
 
 func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
-	const query = "INSERT INTO products (prod_name, price, stock) VALUES ($1, $2, $3) RETURNING *"
+	const query = "insert into products (prod_id, prod_name, price, stock) values ($1, $2, $3, $4) returning *"
 
 	var res models.Product
-	if err := r.db.GetContext(ctx, &res, query, p.Name, p.Price, p.Stock); err != nil {
+	if err := r.db.GetContext(ctx, &res, query, p.ProductID, p.Name, p.Price, p.Stock); err != nil {
 		return models.Product{}, fmt.Errorf("product_repo.Create: %w", err)
 	}
 	return res, nil
 }
 
-func (r pgProductRepo) FetchByID(ctx context.Context, id int64) (models.Product, error) {
-	const query = "SELECT * FROM PRODUCTS WHERE PROD_ID = $1"
+func (r pgProductRepo) FetchByID(ctx context.Context, id string) (models.Product, error) {
+	const query = "select * from products where prod_id = $1"
 
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
@@ -48,7 +48,7 @@ func (r pgProductRepo) FetchByID(ctx context.Context, id int64) (models.Product,
 }
 
 func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
-	const query = "SELECT * FROM PRODUCTS"
+	const query = "select * from products"
 
 	var result []models.Product
 	err := r.db.SelectContext(ctx, &result, query)
@@ -59,22 +59,22 @@ func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
 }
 
 func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error) {
-	query := "UPDATE products SET "
+	query := "update products set "
 	args := make(map[string]interface{})
 	var fieldsToUpdate []string
 	var res models.Product
 
-	if p.Name != nil && *p.Name != "" {
+	if p.Name != "" {
 		fieldsToUpdate = append(fieldsToUpdate, "prod_name = :prod_name")
 		args["prod_name"] = p.Name
 	}
 
-	if p.Stock != nil && *p.Stock != 0 {
+	if p.Stock != 0 {
 		fieldsToUpdate = append(fieldsToUpdate, "stock = :stock")
 		args["stock"] = p.Stock
 	}
 
-	if p.Price != nil && *p.Price != 0 {
+	if p.Price != 0.0 {
 		fieldsToUpdate = append(fieldsToUpdate, "price = :price")
 		args["price"] = p.Price
 	}
@@ -102,8 +102,8 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	return res, nil
 }
 
-func (r pgProductRepo) DeleteByID(ctx context.Context, id int64) (models.Product, error) {
-	const query = "DELETE FROM products where PROD_ID = $1 RETURNING *"
+func (r pgProductRepo) DeleteByID(ctx context.Context, id string) (models.Product, error) {
+	const query = "delete from products where prod_id = $1 returning *"
 
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
