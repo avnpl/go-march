@@ -13,7 +13,7 @@ import (
 type ProductService interface {
 	CreateProduct(ctx context.Context, req *models.CreateProductReq) (models.Product, error)
 	GetProductByID(ctx context.Context, id string) (models.Product, error)
-	GetAllProducts(ctx context.Context) ([]models.Product, error)
+	GetAllProducts(ctx context.Context, limit int, offset int) ([]models.Product, error)
 	UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error)
 	DeleteProduct(ctx context.Context, id string) (models.Product, error)
 }
@@ -54,8 +54,8 @@ func (s *productService) GetProductByID(ctx context.Context, id string) (models.
 	return res, nil
 }
 
-func (s *productService) GetAllProducts(ctx context.Context) ([]models.Product, error) {
-	res, err := s.repo.FetchAll(ctx)
+func (s *productService) GetAllProducts(ctx context.Context, limit int, offset int) ([]models.Product, error) {
+	res, err := s.repo.FetchAll(ctx, limit, offset)
 	if err != nil {
 		return res, fmt.Errorf("product_service.GetAll: %w", err)
 	}

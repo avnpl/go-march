@@ -39,13 +39,22 @@ func (r *Resolver) GetProductByID(p graphql.ResolveParams) (interface{}, error) 
 }
 
 func (r *Resolver) GetAllProducts(p graphql.ResolveParams) (interface{}, error) {
+	limit := 10
+	offset := 0
+
+	if limitVal, ok := p.Args["limit"].(int); ok {
+		limit = limitVal
+	}
+	if offsetVal, ok := p.Args["offset"].(int); ok {
+		offset = offsetVal
+	}
 
 	ctx := p.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	products, err := r.productService.GetAllProducts(ctx)
+	products, err := r.productService.GetAllProducts(ctx, limit, offset)
 	if err != nil {
 		return nil, err
 	}

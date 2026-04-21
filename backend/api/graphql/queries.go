@@ -21,6 +21,16 @@ func GetQueryFields(resolver *Resolver) graphql.Fields {
 			Type:        graphql.NewList(ProductType),
 			Resolve:     resolver.GetAllProducts,
 			Description: "Fetch all products",
+			Args: graphql.FieldConfigArgument{
+				"limit": &graphql.ArgumentConfig{
+					Type:         graphql.Int,
+					DefaultValue: 10,
+				},
+				"offset": &graphql.ArgumentConfig{
+					Type:         graphql.Int,
+					DefaultValue: 0,
+				},
+			},
 		},
 	}
 }

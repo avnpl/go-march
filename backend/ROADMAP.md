@@ -25,8 +25,9 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **Phase 1.1** | 🔶 Partial | Product CRUD; paths differ from target (`/product` vs `/products/{id}`) |
+| **Phase 1.1** | ✅ Complete | Product CRUD with routes (`/products`, `/products/{id}`) + pagination |
 | **Phase 1.2-1.4** | ⬜ Not Started | Orders, payments, payment simulation |
+| **Phase 0** | ⬜ TODO | User authentication with short-lived tokens |
 | **Phase 2** | 🔶 Minimal | GraphQL has products only |
 | **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket stubs |
 | **Phase 6** | ⬜ Not Started | TTL, README |
@@ -35,9 +36,53 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 ---
 
+# Phase 0: User Authentication (TODO)
+
+**Goal**: Users get a short-lived token. All requests must include token in header. Each user only sees their own products/orders.
+
+**Data models to add**:
+- `user_id` (string) — format: `US-XXXXXX` (primary key)
+- `user.token` (string) — short-lived auth token
+- `user.token_expires_at` (timestamp)
+- `user.created_at` (timestamp)
+- Add `user_id` column to products, orders tables
+
+## 0.1 Token Generation
+
+**Auth flow**:
+- [ ] User registers (generates `user_id`)
+- [ ] Server generates token (e.g., `US-XXXXXX:abcdef123456`, 7-char token)
+- [ ] Token expires after configurable duration via `TOKEN_EXPIRY` env var (default: 1 hour, min: 5 minutes)
+- [ ] Returns both `user_id` and `token`
+
+## 0.2 Token Validation
+
+**Per-request validation**:
+- [ ] Extract token from `Authorization: Bearer <token>` header
+- [ ] Validate token exists and not expired
+- [ ] Reject requests with missing/invalid/expired token (401 Unauthorized)
+
+## 0.3 Data Isolation
+
+**Queries filter by user**:
+- [ ] `GET /products` → returns only products where `product.user_id == token.user_id`
+- [ ] `GET /orders` → returns only orders where `order.user_id == token.user_id`
+- [ ] `POST /products` → creates product with `user_id` from token
+- [ ] `POST /orders` → creates order with `user_id` from token
+
+**Implementation notes**:
+- [ ] Add `user_id` column to products, orders tables
+- [ ] Modify service layer to accept `user_id` context
+- [ ] Middleware to validate token and extract `user_id`
+- [ ] Pass `user_id` through context to service/repo layer
+
+---
+
 ## Data Models
 
-### Product
+### Current (no auth)
+
+### Product (current)
 - `prod_id` (string) — format: `PR-XXXXXX` (primary key)
 - `prod_name` (string)
 - `price` (float64)
@@ -46,8 +91,9 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - `updated_at` (timestamp)
 - `ttl_expires_at` (timestamp) — for auto-cleanup
 
-### Order
+### Order (future, Phase 1.2)
 - `order_id` (string) — format: `OR-XXXXXX` (primary key)
+- `user_id` (string, FK) — references `user_id` (Phase 0)
 - `product_id` (string, FK) — references `prod_id`
 - `quantity` (int)
 - `total_price` (float64)
@@ -57,7 +103,7 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - `notes` (string) — updatable
 - `ttl_expires_at` (timestamp)
 
-### Payment
+### Payment (future, Phase 1.3)
 - `payment_id` (string) — format: `PA-XXXXXX` (primary key)
 - `order_id` (string, FK) — references `order_id`
 - `amount` (float64)
@@ -87,20 +133,20 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 ## 1.1 Complete Product CRUD
 
-**Implemented routes** (differs from target naming below — consolidate on `/products` + `/products/{id}` when convenient):
-- [x] `POST /product` — create product
+**Implemented routes**:
+- [x] `POST /products` — create product
 - [x] `GET /products` — list all products
-- [x] `GET /product/{id}` — get single product
-- [x] `PATCH /product` — update product (`prod_id` in JSON body)
-- [x] `DELETE /product/{id}` — delete product *(still returns 200 with JSON; Phase 1 target is 204 No Content)*
+- [x] `GET /products/{id}` — get single product
+- [x] `PATCH /products/{id}` — update product
+- [x] `DELETE /products/{id}` — delete product *(still returns 200 with JSON; Phase 1 target is 204 No Content)*
 
 **Target REST shape** (documentation / client examples):
-- [ ] `POST /products` — create product
-- [x] `GET /products` — list all products *(path matches; POST not on `/products` yet)*
-- [ ] `GET /products/{id}` — get single product
-- [ ] `PATCH /products/{id}` — update product
-- [ ] `DELETE /products/{id}` — delete product
-- [ ] `GET /products` — pagination (e.g. `limit` / `offset` or cursor) so list is never unbounded
+- [x] `POST /products` — create product
+- [x] `GET /products` — list all products
+- [x] `GET /products/{id}` — get single product
+- [x] `PATCH /products/{id}` — update product
+- [x] `DELETE /products/{id}` — delete product
+- [x] `GET /products` — pagination (e.g. `limit` / `offset` or cursor) so list is never unbounded
 
 **Logging improvements** (deferred to Phase 6 or post-Phase 1 cleanup):
 - [ ] **L1** Make log level configurable via `LOG_LEVEL` env var (currently hardcoded to Debug in `utils.BuildLogger`)
@@ -125,7 +171,7 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
   - Location: `product_handler.go:143` — was `http.Error(w, err.Error(), http.StatusConflict)`
   - Issue: exposed internal error messages to client
   - Fix: changed to `utils.SendJSONError(w, http.StatusConflict, "")`
-- [ ] **L7** Standardize debug field naming
+- [x] **L7** Standardize debug field naming
   - Remove spaces from field names (`"request param"` → `"id"`)
   - Remove trailing punctuation from messages (`"received ID => "` → `"received request"`)
   - Example: `product_handler.go:74` — `zap.String("request param", idStr)` → `zap.String("id", idStr)`
@@ -498,9 +544,8 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 
 **Current implementation**
 ```
-/product          POST (create), PATCH (update)
-/products         GET (list)
-/product/{id}     GET, DELETE
+/products         POST, GET (list)
+/products/{id}    GET, PATCH, DELETE
 /graphql          POST
 ```
 
@@ -514,6 +559,15 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 /payments/{id}    GET
 /graphql          POST
 ```
+
+## Auth (`:8080/auth`)
+
+```
+POST /auth/register   Create user, returns user_id + token
+POST /auth/token     Refresh token (extends expiry)
+```
+
+> All endpoints require: `Authorization: Bearer <token>` header
 
 ## SOAP (`:8080/soap`)
 

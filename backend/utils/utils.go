@@ -31,6 +31,10 @@ func GetEnvVarString(key string, defaultValue string, logger *zap.Logger) string
 
 func GetEnvVarInteger(key string, defaultValue int, logger *zap.Logger) int {
 	value := getEnvVar(key)
+	if value == "" {
+		logger.Warn("Key not present in env variables")
+		return defaultValue
+	}
 
 	res, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {

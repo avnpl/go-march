@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/avnpl/go-march/models"
@@ -78,7 +79,7 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.Debug("received ID => ", zap.String("request param", idStr))
+	h.log.Debug("fetching product", zap.String("id", idStr))
 
 	prod, err := h.svc.GetProductByID(r.Context(), idStr)
 	if err != nil {
@@ -96,7 +97,33 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h ProductHandler) FetchAllProducts(w http.ResponseWriter, r *http.Request) {
-	prods, err := h.svc.GetAllProducts(r.Context())
+
+	queryParams := r.URL.Query()
+	limit := 0
+	offset := 0
+	limitStr := queryParams.Get("limit")
+	offsetStr := queryParams.Get("offset")
+	var err error
+
+	if limitStr != "" {
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil {
+			h.log.Error("Invalid query param, limit", zap.String("limit", limitStr), zap.Error(err))
+			utils.SendJSONError(w, http.StatusBadRequest, "Invalid query param, limit")
+			return
+		}
+	}
+
+	if offsetStr != "" {
+		offset, err = strconv.Atoi(limitStr)
+		if err != nil {
+			h.log.Error("Invalid query param, offset", zap.String("offset", offsetStr), zap.Error(err))
+			utils.SendJSONError(w, http.StatusBadRequest, "Invalid query param, offset")
+			return
+		}
+	}
+
+	prods, err := h.svc.GetAllProducts(r.Context(), limit, offset)
 	if err != nil {
 		h.log.Error("FetchAllProducts failed", zap.Error(err))
 		utils.SendInternalError(w)
@@ -108,6 +135,15 @@ func (h ProductHandler) FetchAllProducts(w http.ResponseWriter, r *http.Request)
 }
 
 func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		h.log.Error("no ID provided in request")
+		utils.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
+		return
+	}
+
+	h.log.Debug("updating product", zap.String("id", idStr))
+
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.log.Error("error reading the request body", zap.Error(err))
@@ -128,6 +164,8 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		utils.SendJSONError(w, http.StatusBadRequest, "Invalid JSON in the Request Body")
 		return
 	}
+
+	req.ProductID = idStr
 
 	err = h.validate.Struct(req)
 	if err != nil {
@@ -159,7 +197,7 @@ func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.Debug("received ID => ", zap.String("request param", idStr))
+	h.log.Debug("deleting product", zap.String("id", idStr))
 
 	prod, err := h.svc.DeleteProduct(r.Context(), idStr)
 	if err != nil {

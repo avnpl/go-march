@@ -41,31 +41,26 @@ func main() {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
 	// Initialize the layers
-	productRepo := repos.NewPGProductRepo(db)
+	productRepo := repos.NewPGProductRepo(db, logger)
 	productService := services.NewProductService(productRepo, logger)
 	productHandler := rest.NewProductHandler(productService, logger, validate)
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/product", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
-		case http.MethodPatch:
-			productHandler.UpdateProduct(w, r)
 		case http.MethodPost:
 			productHandler.CreateProduct(w, r)
+		case http.MethodGet:
+			productHandler.FetchAllProducts(w, r)
 		default:
 			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
 		}
 	})
-	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			productHandler.FetchAllProducts(w, r)
-		} else {
-			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
-		}
-	})
-	mux.HandleFunc("/product/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/products/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
+		case http.MethodPatch:
+			productHandler.UpdateProduct(w, r)
 		case http.MethodDelete:
 			productHandler.DeleteProduct(w, r)
 		case http.MethodGet:

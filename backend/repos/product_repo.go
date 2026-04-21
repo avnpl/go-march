@@ -7,23 +7,26 @@ import (
 	"strings"
 
 	"github.com/avnpl/go-march/models"
+	"github.com/avnpl/go-march/utils"
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) (models.Product, error)
 	FetchByID(ctx context.Context, id string) (models.Product, error)
-	FetchAll(ctx context.Context) ([]models.Product, error)
+	FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error)
 	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id string) (models.Product, error)
 }
 
 type pgProductRepo struct {
-	db *sqlx.DB
+	db     *sqlx.DB
+	logger *zap.Logger
 }
 
-func NewPGProductRepo(db *sqlx.DB) ProductRepo {
-	return pgProductRepo{db: db}
+func NewPGProductRepo(db *sqlx.DB, logger *zap.Logger) ProductRepo {
+	return pgProductRepo{db: db, logger: logger}
 }
 
 func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
@@ -47,11 +50,21 @@ func (r pgProductRepo) FetchByID(ctx context.Context, id string) (models.Product
 	return result, nil
 }
 
-func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
-	const query = "select * from products"
+func (r pgProductRepo) FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error) {
+	query := "select * from products limit $1"
+
+	if limit == 0 {
+		limit = utils.GetEnvVarInteger("FETCH_ALL_PRODS_DEFAULT_LIMIT", 10, r.logger)
+	}
+	args := []interface{}{limit}
+
+	if offset != 0 {
+		query += " offset $2"
+		args = append(args, offset)
+	}
 
 	var result []models.Product
-	err := r.db.SelectContext(ctx, &result, query)
+	err := r.db.SelectContext(ctx, &result, query, args...)
 	if err != nil {
 		return result, fmt.Errorf("product_repo.FetchAllProducts: %w", err)
 	}
