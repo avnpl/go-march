@@ -140,7 +140,7 @@ Phase 7   User Authentication ─────────── token-based auth
   - Currently some error logs lack context (e.g., `product_handler.go:100` — no context on FetchAll failure)
 
 **ID generation**:
-- [ ] Change `prod_id` from INT8 to STRING in database schema
+- [x] Change `prod_id` from INT8 to STRING in database schema
 - [x] All code layers use string IDs (models, repo, service, handlers, GraphQL)
 
 ## 1.2 Complete Orders CRUD

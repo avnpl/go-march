@@ -52,7 +52,17 @@ func BuildLogger() *zap.Logger {
 		log.Fatalf("Failed to create log directory: %v", err)
 	}
 
-	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	logLevelFromConfig := getEnvVar("LOG_LEVEL")
+	if logLevelFromConfig == "" {
+		logLevelFromConfig = "info"
+	}
+
+	level := zap.NewAtomicLevel()
+	if err := level.UnmarshalText([]byte(logLevelFromConfig)); err != nil {
+		log.Fatalf("Invalid log level in env : %v", err)
+	}
+
+	loggerConfig.Level = zap.NewAtomicLevelAt(level.Level())
 	loggerConfig.Development = true
 	loggerConfig.EncoderConfig.TimeKey = "ts"
 	loggerConfig.EncoderConfig.MessageKey = "event"
