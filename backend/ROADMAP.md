@@ -108,16 +108,15 @@ Phase 7   User Authentication ─────────── token-based auth
 - [x] `GET /products` — pagination (e.g. `limit` / `offset` or cursor) so list is never unbounded
 
 **Logging improvements** (deferred to Phase 6 or post-Phase 1 cleanup):
-- [ ] **L1** Make log level configurable via `LOG_LEVEL` env var (currently hardcoded to Debug in `utils.BuildLogger`)
-- [ ] **L2** Environment-based logger config (development vs production mode)
+- [x] **L1** Make log level configurable via `LOG_LEVEL` env var (currently hardcoded to Debug in `utils.BuildLogger`)
+- [x] **L2** Environment-based logger config (development vs production mode)
   - Development: console encoding, file output to `logs/app.log`, stack traces on error
   - Production: JSON encoding, stdout only, stack traces on panic
   - Use `ENV` environment variable to switch modes
-- [ ] **L3** Add request ID middleware for context propagation
+- [x] **L3** Add request ID middleware for context propagation
   - Generate unique request ID per HTTP request (e.g., UUID)
   - Inject into `context.Context` via middleware
   - Include in all logs: `zap.String("request_id", requestID)`
-  - Add `X-Request-ID` response header for client correlation
 - [ ] **L4** Add logger to GraphQL resolvers
   - Pass `*zap.Logger` to `Resolver` struct (currently only has `productService`)
   - Log errors in resolver methods (currently silent failures)

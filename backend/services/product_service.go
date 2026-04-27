@@ -7,6 +7,7 @@ import (
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/utils"
+	"github.com/avnpl/go-march/utils/trace"
 	"go.uber.org/zap"
 )
 
@@ -40,7 +41,7 @@ func (s *productService) CreateProduct(ctx context.Context, req *models.CreatePr
 		return models.Product{}, fmt.Errorf("product_service.Create: %w", err)
 	}
 
-	s.log.Info("created product", zap.String("prod_id", p.ProductID))
+	trace.Info(ctx, s.log, "created product", zap.String("prod_id", p.ProductID))
 	return res, nil
 }
 
@@ -48,6 +49,7 @@ func (s *productService) GetProductByID(ctx context.Context, id string) (models.
 	var res models.Product
 	res, err := s.repo.FetchByID(ctx, id)
 	if err != nil {
+		trace.Error(ctx, s.log, "failed to fetch product", zap.String("id", id), zap.Error(err))
 		return res, fmt.Errorf("product_service.Get: %w", err)
 	}
 
@@ -57,6 +59,7 @@ func (s *productService) GetProductByID(ctx context.Context, id string) (models.
 func (s *productService) GetAllProducts(ctx context.Context, limit int, offset int) ([]models.Product, error) {
 	res, err := s.repo.FetchAll(ctx, limit, offset)
 	if err != nil {
+		trace.Error(ctx, s.log, "failed to fetch products", zap.Error(err))
 		return res, fmt.Errorf("product_service.GetAll: %w", err)
 	}
 	return res, nil
@@ -65,18 +68,20 @@ func (s *productService) GetAllProducts(ctx context.Context, limit int, offset i
 func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error) {
 	res, err := s.repo.UpdateByID(ctx, req)
 	if err != nil {
+		trace.Error(ctx, s.log, "failed to update product", zap.Error(err))
 		return models.Product{}, fmt.Errorf("product_service.Update: %w", err)
 	}
-	s.log.Info("updated product", zap.String("prod_id", res.ProductID))
+	trace.Info(ctx, s.log, "updated product", zap.String("prod_id", res.ProductID))
 	return res, nil
 }
 
 func (s *productService) DeleteProduct(ctx context.Context, id string) (models.Product, error) {
 	res, err := s.repo.DeleteByID(ctx, id)
 	if err != nil {
+		trace.Error(ctx, s.log, "failed to delete product", zap.String("id", id), zap.Error(err))
 		return models.Product{}, fmt.Errorf("prod_service.Delete: %w", err)
 	}
 
-	s.log.Info("deleted product", zap.String("prod_id", res.ProductID))
+	trace.Info(ctx, s.log, "deleted product", zap.String("prod_id", res.ProductID))
 	return res, nil
 }

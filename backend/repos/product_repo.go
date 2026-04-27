@@ -8,6 +8,7 @@ import (
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/utils"
+	"github.com/avnpl/go-march/utils/trace"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
@@ -34,6 +35,7 @@ func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Pr
 
 	var res models.Product
 	if err := r.db.GetContext(ctx, &res, query, p.ProductID, p.Name, p.Price, p.Stock); err != nil {
+		trace.Error(ctx, r.logger, "failed to create product", zap.Error(err))
 		return models.Product{}, fmt.Errorf("product_repo.Create: %w", err)
 	}
 	return res, nil
@@ -45,6 +47,7 @@ func (r pgProductRepo) FetchByID(ctx context.Context, id string) (models.Product
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
 	if err != nil {
+		trace.Error(ctx, r.logger, "failed to fetch product by ID", zap.String("id", id), zap.Error(err))
 		return result, fmt.Errorf("product_repo.FetchByID: %w", err)
 	}
 	return result, nil
@@ -63,9 +66,12 @@ func (r pgProductRepo) FetchAll(ctx context.Context, limit int, offset int) ([]m
 		args = append(args, offset)
 	}
 
+	trace.Debug(ctx, r.logger, "fetching all products", zap.Int("limit", limit), zap.Int("offset", offset))
+
 	var result []models.Product
 	err := r.db.SelectContext(ctx, &result, query, args...)
 	if err != nil {
+		trace.Error(ctx, r.logger, "failed to fetch all products", zap.Error(err))
 		return result, fmt.Errorf("product_repo.FetchAllProducts: %w", err)
 	}
 	return result, nil
@@ -97,8 +103,11 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	query += " WHERE prod_id = :prod_id RETURNING *"
 	args["prod_id"] = p.ProductID
 
+	trace.Debug(ctx, r.logger, "updating product", zap.String("prod_id", p.ProductID))
+
 	result, err := r.db.NamedQueryContext(ctx, query, args)
 	if err != nil {
+		trace.Error(ctx, r.logger, "failed to update product", zap.String("prod_id", p.ProductID), zap.Error(err))
 		return models.Product{}, fmt.Errorf("product_repo.Update: %w", err)
 	}
 	defer result.Close()
@@ -106,6 +115,7 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	if result.Next() {
 		err := result.StructScan(&res)
 		if err != nil {
+			trace.Error(ctx, r.logger, "failed to scan updated product", zap.Error(err))
 			return models.Product{}, fmt.Errorf("product_repo.Update: %w", err)
 		}
 	} else {
@@ -118,9 +128,12 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 func (r pgProductRepo) DeleteByID(ctx context.Context, id string) (models.Product, error) {
 	const query = "delete from products where prod_id = $1 returning *"
 
+	trace.Debug(ctx, r.logger, "deleting product", zap.String("prod_id", id))
+
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
 	if err != nil {
+		trace.Error(ctx, r.logger, "failed to delete product", zap.String("prod_id", id), zap.Error(err))
 		return result, fmt.Errorf("product_repo.DeleteByID: %w", err)
 	}
 	return result, nil
