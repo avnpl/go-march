@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -12,10 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	gql "github.com/avnpl/go-march/api/graphql"
+	"github.com/avnpl/go-march/api/graphql"
 	"github.com/avnpl/go-march/api/rest"
 	"github.com/go-playground/validator/v10"
-	"github.com/graphql-go/graphql"
 	"github.com/joho/godotenv"
 
 	"github.com/avnpl/go-march/repos"
@@ -44,53 +41,12 @@ func main() {
 	productRepo := repos.NewPGProductRepo(db, logger)
 	productService := services.NewProductService(productRepo, logger)
 	productHandler := rest.NewProductHandler(productService, logger, validate)
+	gqlHandler := graphql.NewGraphQLHandler(productService, logger)
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
 	productHandler.RegisterRoutes(mux)
-	if err := gql.NewSchema(productService, logger); err != nil {
-		logger.Fatal("failed to instantiate GraphQL Schema", zap.Error(err))
-	}
-
-	mux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
-
-		if r.Method != http.MethodPost {
-			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
-			return
-		}
-
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			utils.SendJSONError(w, http.StatusBadRequest, "Invalid Request")
-			return
-		}
-		logger.Debug("graphql body", zap.String("body", string(bodyBytes)))
-
-		var params struct {
-			Query string `json:"query"`
-		}
-		err = json.Unmarshal(bodyBytes, &params)
-		if err != nil {
-			logger.Error("failed to decode GraphQL request", zap.Error(err))
-			utils.SendJSONError(w, http.StatusBadRequest, "Invalid Request")
-			return
-		}
-
-		if params.Query == "" {
-			utils.SendJSONError(w, http.StatusBadRequest, "Query cannot be empty")
-			return
-		}
-
-		result := graphql.Do(graphql.Params{
-			Schema:        gql.Schema,
-			RequestString: params.Query,
-			Context:       r.Context(),
-		})
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(result)
-	})
+	gqlHandler.RegisterRoutes(mux)
 
 	port := utils.GetEnvVarString("PORT", ":8013", logger)
 
