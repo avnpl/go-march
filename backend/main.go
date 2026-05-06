@@ -37,15 +37,21 @@ func main() {
 
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
-	// Initialize the layers
+	// Initialize the Product layers
 	productRepo := repos.NewPGProductRepo(db, logger)
 	productService := services.NewProductService(productRepo, logger)
 	productHandler := rest.NewProductHandler(productService, logger, validate)
 	gqlHandler := graphql.NewGraphQLHandler(productService, logger)
 
+	// Initialize the Order layers
+	orderRepo := repos.NewPGOrderRepo(db, logger)
+	orderService := services.NewOrderService(orderRepo, logger)
+	orderHandler := rest.NewOrderHandler(orderService, logger, validate)
+
 	// Set up the HTTP server
 	mux := http.NewServeMux()
 	productHandler.RegisterRoutes(mux)
+	orderHandler.RegisterRoutes(mux)
 	gqlHandler.RegisterRoutes(mux)
 
 	port := utils.GetEnvVarString("PORT", ":8013", logger)
