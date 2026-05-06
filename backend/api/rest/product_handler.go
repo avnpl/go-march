@@ -131,7 +131,7 @@ func (h ProductHandler) FetchAllProducts(w http.ResponseWriter, r *http.Request)
 
 	prods, err := h.svc.GetAllProducts(ctx, limit, offset)
 	if err != nil {
-		trace.Error(ctx, h.logger, "FetchAllProducts failed", zap.Error(err))
+		trace.Error(ctx, h.logger, "FetchAllProducts failed", zap.Int("limit", limit), zap.Int("offset", offset), zap.Error(err))
 		utils.SendInternalError(w)
 		return
 	}

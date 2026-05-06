@@ -70,7 +70,7 @@ func main() {
 		}
 	})
 
-	if err := gql.NewSchema(productService); err != nil {
+	if err := gql.NewSchema(productService, logger); err != nil {
 		logger.Fatal("failed to instantiate GraphQL Schema", zap.Error(err))
 	}
 
@@ -83,7 +83,7 @@ func main() {
 
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
-			utils.SendInternalError(w)
+			utils.SendJSONError(w, http.StatusBadRequest, "Invalid Request")
 			return
 		}
 		logger.Debug("graphql body", zap.String("body", string(bodyBytes)))

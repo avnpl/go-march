@@ -68,7 +68,7 @@ func (s *productService) GetAllProducts(ctx context.Context, limit int, offset i
 func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error) {
 	res, err := s.repo.UpdateByID(ctx, req)
 	if err != nil {
-		trace.Error(ctx, s.log, "failed to update product", zap.Error(err))
+		trace.Error(ctx, s.log, "failed to update product", zap.String("prod_id", req.ProductID), zap.Error(err))
 		return models.Product{}, fmt.Errorf("product_service.Update: %w", err)
 	}
 	trace.Info(ctx, s.log, "updated product", zap.String("prod_id", res.ProductID))

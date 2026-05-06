@@ -117,11 +117,11 @@ Phase 7   User Authentication ─────────── token-based auth
   - Generate unique request ID per HTTP request (e.g., UUID)
   - Inject into `context.Context` via middleware
   - Include in all logs: `zap.String("request_id", requestID)`
-- [ ] **L4** Add logger to GraphQL resolvers
+- [x] **L4** Add logger to GraphQL resolvers
   - Pass `*zap.Logger` to `Resolver` struct (currently only has `productService`)
   - Log errors in resolver methods (currently silent failures)
   - Include query/mutation name in log context
-- [ ] **L5** Standardize service layer logging policy
+- [x] **L5** Standardize service layer logging policy
   - Log mutations (create/update/delete) at Info level with entity ID
   - Don't log read operations (get/list) unless they fail
   - Document this policy in CLAUDE.md
@@ -133,7 +133,7 @@ Phase 7   User Authentication ─────────── token-based auth
   - Remove spaces from field names (`"request param"` → `"id"`)
   - Remove trailing punctuation from messages (`"received ID => "` → `"received request"`)
   - Example: `product_handler.go:74` — `zap.String("request param", idStr)` → `zap.String("id", idStr)`
-- [ ] **L8** Add context fields to error logs
+- [x] **L8** Add context fields to error logs
   - Include relevant IDs/identifiers when logging errors for traceability
   - Example: `h.log.Error("failed to fetch product", zap.Error(err), zap.String("id", idStr))`
   - Currently some error logs lack context (e.g., `product_handler.go:100` — no context on FetchAll failure)

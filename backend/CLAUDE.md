@@ -170,6 +170,12 @@ logger.Info("product created", zap.String("id", product.ProductID))
 logger.Error("failed to fetch product", zap.Error(err), zap.String("id", id))
 ```
 
+**Service layer policy**:
+- Log mutations (create/update/delete) at Info level with entity ID
+- Log errors at Error level with relevant context (IDs, input values)
+- Don't log read operations (get/list) unless they fail
+- Use `trace.Info()`, `trace.Error()` from `utils/trace` for context propagation
+
 Never log request bodies — they may contain PII or secrets.
 
 ---

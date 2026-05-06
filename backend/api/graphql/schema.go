@@ -3,6 +3,7 @@ package graphql
 import (
 	"github.com/avnpl/go-march/services"
 	"github.com/graphql-go/graphql"
+	"go.uber.org/zap"
 )
 
 var (
@@ -11,8 +12,8 @@ var (
 	Schema       graphql.Schema
 )
 
-func NewSchema(productService services.ProductService) error {
-	resolver := NewResolver(productService)
+func NewSchema(productService services.ProductService, logger *zap.Logger) error {
+	resolver := NewResolver(productService, logger)
 
 	QueryType = graphql.NewObject(graphql.ObjectConfig{
 		Name:   "Query",
