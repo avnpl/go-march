@@ -47,29 +47,7 @@ func main() {
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			productHandler.CreateProduct(w, r)
-		case http.MethodGet:
-			productHandler.FetchAllProducts(w, r)
-		default:
-			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
-		}
-	})
-	mux.HandleFunc("/products/{id}", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPatch:
-			productHandler.UpdateProduct(w, r)
-		case http.MethodDelete:
-			productHandler.DeleteProduct(w, r)
-		case http.MethodGet:
-			productHandler.FetchProduct(w, r)
-		default:
-			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
-		}
-	})
-
+	productHandler.RegisterRoutes(mux)
 	if err := gql.NewSchema(productService, logger); err != nil {
 		logger.Fatal("failed to instantiate GraphQL Schema", zap.Error(err))
 	}

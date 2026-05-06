@@ -20,7 +20,7 @@ import (
 
 type ProductHandler struct {
 	svc      services.ProductService
-	logger  *zap.Logger
+	logger   *zap.Logger
 	validate *validator.Validate
 }
 
@@ -28,7 +28,32 @@ func NewProductHandler(svc services.ProductService, logger *zap.Logger, validate
 	return ProductHandler{svc: svc, logger: logger, validate: validate}
 }
 
-func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
+func (h ProductHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/products", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			h.createProduct(w, r)
+		case http.MethodGet:
+			h.fetchAllProducts(w, r)
+		default:
+			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
+		}
+	})
+	mux.HandleFunc("/products/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPatch:
+			h.updateProduct(w, r)
+		case http.MethodDelete:
+			h.deleteProduct(w, r)
+		case http.MethodGet:
+			h.fetchProduct(w, r)
+		default:
+			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
+		}
+	})
+}
+
+func (h ProductHandler) createProduct(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	bodyBytes, err := io.ReadAll(r.Body)
@@ -74,7 +99,7 @@ func (h ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(prod)
 }
 
-func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
+func (h ProductHandler) fetchProduct(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	idStr := r.PathValue("id")
@@ -101,7 +126,7 @@ func (h ProductHandler) FetchProduct(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(prod)
 }
 
-func (h ProductHandler) FetchAllProducts(w http.ResponseWriter, r *http.Request) {
+func (h ProductHandler) fetchAllProducts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	queryParams := r.URL.Query()
@@ -140,7 +165,7 @@ func (h ProductHandler) FetchAllProducts(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(prods)
 }
 
-func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+func (h ProductHandler) updateProduct(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	idStr := r.PathValue("id")
@@ -197,7 +222,7 @@ func (h ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(prod)
 }
 
-func (h ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
+func (h ProductHandler) deleteProduct(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	idStr := r.PathValue("id")
