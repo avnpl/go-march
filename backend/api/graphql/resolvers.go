@@ -5,20 +5,20 @@ import (
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
-	"github.com/avnpl/go-march/utils/trace"
+	"github.com/avnpl/go-march/utils/log"
 	"github.com/graphql-go/graphql"
 	"go.uber.org/zap"
 )
 
 type Resolver struct {
 	productService services.ProductService
-	logger       *zap.Logger
+	logger         *zap.Logger
 }
 
 func NewResolver(productService services.ProductService, logger *zap.Logger) *Resolver {
 	return &Resolver{
 		productService: productService,
-		logger:       logger,
+		logger:         logger,
 	}
 }
 
@@ -36,7 +36,7 @@ func (r *Resolver) GetProductByID(p graphql.ResolveParams) (interface{}, error) 
 
 	product, err := r.productService.GetProductByID(ctx, idStr)
 	if err != nil {
-		trace.Error(ctx, r.logger, "resolver: getProductByID failed", zap.String("id", idStr), zap.Error(err))
+		log.Error(ctx, r.logger, "resolver: getProductByID failed", zap.String("id", idStr), zap.Error(err))
 		return nil, err
 	}
 
@@ -61,7 +61,7 @@ func (r *Resolver) GetAllProducts(p graphql.ResolveParams) (interface{}, error) 
 
 	products, err := r.productService.GetAllProducts(ctx, limit, offset)
 	if err != nil {
-		trace.Error(ctx, r.logger, "resolver: getAllProducts failed", zap.Error(err))
+		log.Error(ctx, r.logger, "resolver: getAllProducts failed", zap.Error(err))
 		return nil, err
 	}
 
@@ -102,7 +102,7 @@ func (r *Resolver) UpdateProduct(p graphql.ResolveParams) (interface{}, error) {
 
 	product, err := r.productService.UpdateProduct(ctx, req)
 	if err != nil {
-		trace.Error(ctx, r.logger, "resolver: updateProduct failed", zap.String("prod_id", prodID), zap.Error(err))
+		log.Error(ctx, r.logger, "resolver: updateProduct failed", zap.String("prod_id", prodID), zap.Error(err))
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func (r *Resolver) DeleteProduct(p graphql.ResolveParams) (interface{}, error) {
 
 	product, err := r.productService.DeleteProduct(ctx, productID)
 	if err != nil {
-		trace.Error(ctx, r.logger, "resolver: deleteProduct failed", zap.String("prod_id", productID), zap.Error(err))
+		log.Error(ctx, r.logger, "resolver: deleteProduct failed", zap.String("prod_id", productID), zap.Error(err))
 		return nil, err
 	}
 

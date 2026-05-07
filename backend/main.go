@@ -54,10 +54,10 @@ func main() {
 	orderHandler.RegisterRoutes(mux)
 	gqlHandler.RegisterRoutes(mux)
 
-	port := utils.GetEnvVarString("PORT", ":8013", logger)
+	port := utils.GetEnvVarString("PORT", "8013", logger)
 
-	srv := &http.Server{
-		Addr:         port,
+	server := &http.Server{
+		Addr:         ":" + port,
 		Handler:      utils.RequestIDMiddleware(mux),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -67,7 +67,7 @@ func main() {
 	// Start the server in a separate GR
 	go func() {
 		logger.Info("listening on " + port)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("serve error", zap.Error(err))
 		}
 	}()
@@ -80,6 +80,6 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	srv.Shutdown(ctx)
+	server.Shutdown(ctx)
 	logger.Info("goodbye")
 }

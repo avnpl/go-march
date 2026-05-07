@@ -15,12 +15,17 @@ type Product struct {
 	TTLExpires sql.NullTime `db:"ttl_expires_at" json:"-"`
 }
 
-type Orders struct {
-	OrderID   string    `db:"order_id"`
-	Quantity  int       `db:"quantity"`
-	ProductID string    `db:"product_id"`
-	Amount    float64   `db:"amount"`
-	CreatedAt time.Time `db:"order_time"`
+type Order struct {
+	OrderID         string       `db:"order_id"`
+	ProductID       string       `db:"product_id"`
+	Quantity        int          `db:"quantity"`
+	Amount          float64      `db:"amount"`
+	CreatedAt       time.Time    `db:"created_at"`
+	Status          string       `db:"status"`
+	ShippingAddress string       `db:"shipping_address"`
+	CardNumber      string       `db:"card_number"`
+	Notes           string       `db:"notes"`
+	ExpiresAt       sql.NullTime `db:"ttl_expires_at"`
 }
 
 type CreateProductReq struct {
@@ -34,4 +39,13 @@ type UpdateProductReq struct {
 	Name      string  `json:"name,omitempty"`
 	Price     float64 `json:"price,omitempty" validate:"omitempty,gt=0"`
 	Stock     int     `json:"stock,omitempty" validate:"omitempty,min=0"`
+}
+
+type CreateOrderReq struct {
+	ProductID       string  `json:"prod_id" validate:"required"`
+	Quantity        int     `json:"quantity,omitempty" validate:"omitempty,min=0"`
+	Amount          float64 `json:"price,omitempty" validate:"omitempty,gt=0"`
+	ShippingAddress string  `json:"shippingAddress,omitempty" validate:"required"`
+	Notes           string  `json:"notes,omitempty"`
+	CardNumber      string  `json:"card_num" validate:"required,numeric,len=16"`
 }

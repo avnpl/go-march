@@ -13,7 +13,7 @@ import (
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
 	"github.com/avnpl/go-march/utils"
-	"github.com/avnpl/go-march/utils/trace"
+	"github.com/avnpl/go-march/utils/log"
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
 )
@@ -58,13 +58,13 @@ func (h ProductHandler) createProduct(w http.ResponseWriter, r *http.Request) {
 
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		trace.Error(ctx, h.logger, "error reading the request body", zap.Error(err))
+		log.Error(ctx, h.logger, "error reading the request body", zap.Error(err))
 		utils.SendJSONError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	reqString := string(bodyBytes)
-	trace.Debug(ctx, h.logger, "raw body",
+	log.Debug(ctx, h.logger, "raw body",
 		zap.Int("length", len(bodyBytes)),
 		zap.String("body", strings.ReplaceAll(reqString, " ", "")),
 	)
@@ -72,7 +72,7 @@ func (h ProductHandler) createProduct(w http.ResponseWriter, r *http.Request) {
 
 	var req models.CreateProductReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		trace.Error(ctx, h.logger, "invalid JSON", zap.Error(err))
+		log.Error(ctx, h.logger, "invalid JSON", zap.Error(err))
 		utils.SendJSONError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
@@ -86,7 +86,7 @@ func (h ProductHandler) createProduct(w http.ResponseWriter, r *http.Request) {
 
 	prod, err := h.svc.CreateProduct(ctx, &req)
 	if err != nil {
-		trace.Error(ctx, h.logger, "CreateProduct failed", zap.Error(err))
+		log.Error(ctx, h.logger, "CreateProduct failed", zap.Error(err))
 		if errors.Is(err, utils.ErrConflict) {
 			utils.SendJSONError(w, http.StatusConflict, "")
 			return
@@ -104,16 +104,16 @@ func (h ProductHandler) fetchProduct(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.PathValue("id")
 	if idStr == "" {
-		trace.Error(ctx, h.logger, "no ID provided in request")
+		log.Error(ctx, h.logger, "no ID provided in request")
 		utils.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
 		return
 	}
 
-	trace.Debug(ctx, h.logger, "fetching product", zap.String("id", idStr))
+	log.Debug(ctx, h.logger, "fetching product", zap.String("id", idStr))
 
 	prod, err := h.svc.GetProductByID(ctx, idStr)
 	if err != nil {
-		trace.Error(ctx, h.logger, "GetProductByID failed", zap.Error(err))
+		log.Error(ctx, h.logger, "GetProductByID failed", zap.Error(err))
 		if errors.Is(err, sql.ErrNoRows) {
 			utils.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")
 			return
@@ -139,7 +139,7 @@ func (h ProductHandler) fetchAllProducts(w http.ResponseWriter, r *http.Request)
 	if limitStr != "" {
 		limit, err = strconv.Atoi(limitStr)
 		if err != nil {
-			trace.Error(ctx, h.logger, "Invalid query param, limit", zap.String("limit", limitStr), zap.Error(err))
+			log.Error(ctx, h.logger, "Invalid query param, limit", zap.String("limit", limitStr), zap.Error(err))
 			utils.SendJSONError(w, http.StatusBadRequest, "Invalid query param, limit")
 			return
 		}
@@ -148,7 +148,7 @@ func (h ProductHandler) fetchAllProducts(w http.ResponseWriter, r *http.Request)
 	if offsetStr != "" {
 		offset, err = strconv.Atoi(limitStr)
 		if err != nil {
-			trace.Error(ctx, h.logger, "Invalid query param, offset", zap.String("offset", offsetStr), zap.Error(err))
+			log.Error(ctx, h.logger, "Invalid query param, offset", zap.String("offset", offsetStr), zap.Error(err))
 			utils.SendJSONError(w, http.StatusBadRequest, "Invalid query param, offset")
 			return
 		}
@@ -156,7 +156,7 @@ func (h ProductHandler) fetchAllProducts(w http.ResponseWriter, r *http.Request)
 
 	prods, err := h.svc.GetAllProducts(ctx, limit, offset)
 	if err != nil {
-		trace.Error(ctx, h.logger, "FetchAllProducts failed", zap.Int("limit", limit), zap.Int("offset", offset), zap.Error(err))
+		log.Error(ctx, h.logger, "FetchAllProducts failed", zap.Int("limit", limit), zap.Int("offset", offset), zap.Error(err))
 		utils.SendInternalError(w)
 		return
 	}
@@ -170,22 +170,22 @@ func (h ProductHandler) updateProduct(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.PathValue("id")
 	if idStr == "" {
-		trace.Error(ctx, h.logger, "no ID provided in request")
+		log.Error(ctx, h.logger, "no ID provided in request")
 		utils.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
 		return
 	}
 
-	trace.Debug(ctx, h.logger, "updating product", zap.String("id", idStr))
+	log.Debug(ctx, h.logger, "updating product", zap.String("id", idStr))
 
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		trace.Error(ctx, h.logger, "error reading the request body", zap.Error(err))
+		log.Error(ctx, h.logger, "error reading the request body", zap.Error(err))
 		utils.SendInternalError(w)
 		return
 	}
 
 	reqString := string(bodyBytes)
-	trace.Debug(ctx, h.logger, "raw body",
+	log.Debug(ctx, h.logger, "raw body",
 		zap.Int("length", len(bodyBytes)),
 		zap.String("body", strings.ReplaceAll(reqString, " ", "")),
 	)
@@ -193,7 +193,7 @@ func (h ProductHandler) updateProduct(w http.ResponseWriter, r *http.Request) {
 
 	var req models.UpdateProductReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		trace.Error(ctx, h.logger, "invalid JSON", zap.Error(err))
+		log.Error(ctx, h.logger, "invalid JSON", zap.Error(err))
 		utils.SendJSONError(w, http.StatusBadRequest, "Invalid JSON in the Request Body")
 		return
 	}
@@ -214,7 +214,7 @@ func (h ProductHandler) updateProduct(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		utils.SendInternalError(w)
-		trace.Error(ctx, h.logger, "UpdateProduct failed", zap.Error(err))
+		log.Error(ctx, h.logger, "UpdateProduct failed", zap.Error(err))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -227,12 +227,12 @@ func (h ProductHandler) deleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	idStr := r.PathValue("id")
 	if idStr == "" {
-		trace.Error(ctx, h.logger, "no ID provided in request")
+		log.Error(ctx, h.logger, "no ID provided in request")
 		utils.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
 		return
 	}
 
-	trace.Debug(ctx, h.logger, "deleting product", zap.String("id", idStr))
+	log.Debug(ctx, h.logger, "deleting product", zap.String("id", idStr))
 
 	prod, err := h.svc.DeleteProduct(ctx, idStr)
 	if err != nil {
@@ -240,7 +240,7 @@ func (h ProductHandler) deleteProduct(w http.ResponseWriter, r *http.Request) {
 			utils.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")
 			return
 		}
-		trace.Error(ctx, h.logger, "DeleteProductByID failed", zap.Error(err))
+		log.Error(ctx, h.logger, "DeleteProductByID failed", zap.Error(err))
 		utils.SendInternalError(w)
 		return
 	}

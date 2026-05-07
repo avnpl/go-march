@@ -156,6 +156,12 @@ Phase 7   User Authentication ─────────── token-based auth
 - [ ] Auto-set order status based on payment (handled later)
 - [ ] Generate `OR-XXXXXX` ID in service layer on create
 
+**Create order — pending / incomplete** (handler or service may exist before this is finished; implement end-to-end in service + repo layers):
+- [ ] **Stock check**: before insert, ensure `products.stock >= quantity`; reject when insufficient (prevents overselling under concurrency when combined with transactional update below).
+- [ ] **Stock decrement**: update `products.stock` (subtract `quantity`) in the **same transaction** as inserting the order row so both succeed or both roll back.
+- [ ] **Error mapping** (do not expose internal DB messages): product missing → **404**; insufficient stock → **409 Conflict** (or **422 Unprocessable Entity**, project-wide pick one); invalid body / `quantity <= 0` → **400**; transaction / unexpected failures → **500** with generic client message.
+- [ ] Optional later: retries, idempotency keys, or row-level locking strategy if contention shows up in tests.
+
 ## 1.3 Complete Payments API
 
 **Endpoints** (no refunds):
