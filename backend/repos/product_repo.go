@@ -15,10 +15,12 @@ import (
 
 type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) (models.Product, error)
-	FetchByID(ctx context.Context, id string) (models.Product, error)
+	FetchByID(txn *sqlx.Tx, ctx context.Context, id string) (models.Product, error)
 	FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error)
 	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id string) (models.Product, error)
+	UpdateProductStock(txn *sqlx.Tx, ctx context.Context, id string, stock int) error
+	BeginTransaction() (*sqlx.Tx, error)
 }
 
 type pgProductRepo struct {
@@ -41,11 +43,18 @@ func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Pr
 	return res, nil
 }
 
-func (r pgProductRepo) FetchByID(ctx context.Context, id string) (models.Product, error) {
+func (r pgProductRepo) FetchByID(txn *sqlx.Tx, ctx context.Context, id string) (models.Product, error) {
 	const query = "select * from products where prod_id = $1"
 
 	var result models.Product
-	err := r.db.GetContext(ctx, &result, query, id)
+
+	var err error
+	if txn != nil {
+		err = txn.GetContext(ctx, &result, query, id)
+	} else {
+		err = r.db.GetContext(ctx, &result, query, id)
+	}
+
 	if err != nil {
 		log.Error(ctx, r.logger, "failed to fetch product by ID", zap.String("id", id), zap.Error(err))
 		return result, fmt.Errorf("product_repo.FetchByID: %w", err)
@@ -137,4 +146,19 @@ func (r pgProductRepo) DeleteByID(ctx context.Context, id string) (models.Produc
 		return result, fmt.Errorf("product_repo.DeleteByID: %w", err)
 	}
 	return result, nil
+}
+
+func (r pgProductRepo) UpdateProductStock(txn *sqlx.Tx, ctx context.Context, id string, stock int) error {
+	const query = "update products set stock = $1 where prod_id = $2"
+
+	_, err := txn.ExecContext(ctx, query, stock, id)
+	if err != nil {
+		log.Error(ctx, r.logger, "failed to decrement count", zap.String("prod_id", id), zap.Error(err))
+		return fmt.Errorf("product_repo.UpdateProductStock : %w", err)
+	}
+	return nil
+}
+
+func (r pgProductRepo) BeginTransaction() (*sqlx.Tx, error) {
+	return r.db.Beginx()
 }

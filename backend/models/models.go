@@ -43,9 +43,9 @@ type UpdateProductReq struct {
 
 type CreateOrderReq struct {
 	ProductID       string  `json:"prod_id" validate:"required"`
-	Quantity        int     `json:"quantity,omitempty" validate:"omitempty,min=0"`
-	Amount          float64 `json:"price,omitempty" validate:"omitempty,gt=0"`
-	ShippingAddress string  `json:"shippingAddress,omitempty" validate:"required"`
+	Quantity        int     `json:"quantity" validate:"required,gt=0"`
+	Amount          float64 `json:"amount" validate:"required,gt=0"`
+	ShippingAddress string  `json:"shippingAddress" validate:"required"`
 	Notes           string  `json:"notes,omitempty"`
 	CardNumber      string  `json:"card_num" validate:"required,numeric,len=16"`
 }

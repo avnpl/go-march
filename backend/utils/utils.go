@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avnpl/go-march/utils/customErrors"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -107,7 +108,7 @@ func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
 }
 
 func SendJSONError(w http.ResponseWriter, statusCode int, message string) {
-	apiErr := APIError{
+	apiErr := customErrors.APIError{
 		Error:   http.StatusText(statusCode),
 		Message: message,
 	}

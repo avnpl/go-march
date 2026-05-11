@@ -11,7 +11,7 @@ import (
 )
 
 type OrderRepo interface {
-	Create(ctx context.Context, order models.Order) (models.Order, error)
+	Create(txn *sqlx.Tx, ctx context.Context, order models.Order) (models.Order, error)
 	Fetch()
 	FetchAll()
 	Delete()
@@ -26,11 +26,11 @@ func NewPGOrderRepo(db *sqlx.DB, logger *zap.Logger) OrderRepo {
 	return pgOrderRepo{db: db, logger: logger}
 }
 
-func (p pgOrderRepo) Create(ctx context.Context, order models.Order) (models.Order, error) {
-	const query = "insert into orders (order_id, product_id, quantity, amount, created_at, status, shipping_address, card_number, notes) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning *"
+func (p pgOrderRepo) Create(txn *sqlx.Tx, ctx context.Context, order models.Order) (models.Order, error) {
+	const insertOrderQuery = "insert into orders (order_id, product_id, quantity, amount, created_at, status, shipping_address, card_number, notes) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning *"
 
 	var res models.Order
-	if err := p.db.GetContext(ctx, &res, query, order.OrderID, order.ProductID, order.Quantity, order.Amount, order.CreatedAt, order.Status, order.ShippingAddress, order.CardNumber, order.Notes); err != nil {
+	if err := txn.GetContext(ctx, &res, insertOrderQuery, order.OrderID, order.ProductID, order.Quantity, order.Amount, order.CreatedAt, order.Status, order.ShippingAddress, order.CardNumber, order.Notes); err != nil {
 		log.Error(ctx, p.logger, "failed to create order", zap.Error(err))
 		return models.Order{}, fmt.Errorf("order_repo.Create: %w", err)
 	}

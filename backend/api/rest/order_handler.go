@@ -68,11 +68,13 @@ func (h OrderHandler) createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	order, err := h.svc.Create(ctx, req)
+
 	if err != nil {
 		log.Error(ctx, h.logger, "CreateOrder failed", zap.Error(err))
-		utils.SendInternalError(w)
+		SendErrorResponse(ctx, w, err)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(order)

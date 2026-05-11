@@ -45,7 +45,7 @@ func main() {
 
 	// Initialize the Order layers
 	orderRepo := repos.NewPGOrderRepo(db, logger)
-	orderService := services.NewOrderService(orderRepo, logger)
+	orderService := services.NewOrderService(orderRepo, productRepo, logger)
 	orderHandler := rest.NewOrderHandler(orderService, logger, validate)
 
 	// Set up the HTTP server

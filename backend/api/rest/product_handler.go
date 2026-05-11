@@ -13,6 +13,7 @@ import (
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
 	"github.com/avnpl/go-march/utils"
+	"github.com/avnpl/go-march/utils/customErrors"
 	"github.com/avnpl/go-march/utils/log"
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
@@ -87,7 +88,7 @@ func (h ProductHandler) createProduct(w http.ResponseWriter, r *http.Request) {
 	prod, err := h.svc.CreateProduct(ctx, &req)
 	if err != nil {
 		log.Error(ctx, h.logger, "CreateProduct failed", zap.Error(err))
-		if errors.Is(err, utils.ErrConflict) {
+		if errors.Is(err, customErrors.Conflict) {
 			utils.SendJSONError(w, http.StatusConflict, "")
 			return
 		}
@@ -209,7 +210,7 @@ func (h ProductHandler) updateProduct(w http.ResponseWriter, r *http.Request) {
 
 	prod, err := h.svc.UpdateProduct(ctx, &req)
 	if err != nil {
-		if errors.Is(err, utils.ErrConflict) {
+		if errors.Is(err, customErrors.Conflict) {
 			utils.SendJSONError(w, http.StatusConflict, "")
 			return
 		}
