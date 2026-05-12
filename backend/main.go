@@ -38,13 +38,13 @@ func main() {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
 	// Initialize the Product layers
-	productRepo := repos.NewPGProductRepo(db, logger)
+	productRepo := repos.NewProductRepo(db, logger)
 	productService := services.NewProductService(productRepo, logger)
 	productHandler := rest.NewProductHandler(productService, logger, validate)
 	gqlHandler := graphql.NewGraphQLHandler(productService, logger)
 
 	// Initialize the Order layers
-	orderRepo := repos.NewPGOrderRepo(db, logger)
+	orderRepo := repos.NewOrderRepo(db, logger)
 	orderService := services.NewOrderService(orderRepo, productRepo, logger)
 	orderHandler := rest.NewOrderHandler(orderService, logger, validate)
 

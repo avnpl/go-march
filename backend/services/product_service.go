@@ -2,11 +2,14 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/utils"
+	"github.com/avnpl/go-march/utils/customErrors"
 	"github.com/avnpl/go-march/utils/log"
 	"go.uber.org/zap"
 )
@@ -46,9 +49,12 @@ func (s *productService) CreateProduct(ctx context.Context, req *models.CreatePr
 }
 
 func (s *productService) GetProductByID(ctx context.Context, id string) (models.Product, error) {
-	var res models.Product
 	res, err := s.repo.FetchByID(nil, ctx, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return res, customErrors.RecordNotFound
+		}
+
 		log.Error(ctx, s.log, "failed to fetch product", zap.String("id", id), zap.Error(err))
 		return res, fmt.Errorf("product_service.Get: %w", err)
 	}

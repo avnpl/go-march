@@ -115,11 +115,7 @@ func (h ProductHandler) fetchProduct(w http.ResponseWriter, r *http.Request) {
 	prod, err := h.svc.GetProductByID(ctx, idStr)
 	if err != nil {
 		log.Error(ctx, h.logger, "GetProductByID failed", zap.Error(err))
-		if errors.Is(err, sql.ErrNoRows) {
-			utils.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")
-			return
-		}
-		utils.SendInternalError(w)
+		SendErrorResponse(ctx, w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

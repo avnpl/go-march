@@ -16,16 +16,16 @@ type Product struct {
 }
 
 type Order struct {
-	OrderID         string       `db:"order_id"`
-	ProductID       string       `db:"product_id"`
-	Quantity        int          `db:"quantity"`
-	Amount          float64      `db:"amount"`
-	CreatedAt       time.Time    `db:"created_at"`
-	Status          string       `db:"status"`
-	ShippingAddress string       `db:"shipping_address"`
-	CardNumber      string       `db:"card_number"`
-	Notes           string       `db:"notes"`
-	ExpiresAt       sql.NullTime `db:"ttl_expires_at"`
+	OrderID         string       `db:"order_id" json:"order_id"`
+	ProductID       string       `db:"product_id" json:"product_id"`
+	Quantity        int          `db:"quantity" json:"quantity"`
+	Amount          float64      `db:"amount" json:"amount"`
+	CreatedAt       time.Time    `db:"created_at" json:"created_at"`
+	Status          string       `db:"status" json:"status"`
+	ShippingAddress string       `db:"shipping_address" json:"shipping_address"`
+	CardNumber      string       `db:"card_number" json:"card_number"`
+	Notes           string       `db:"notes" json:"notes"`
+	ExpiresAt       sql.NullTime `db:"ttl_expires_at" json:"-"`
 }
 
 type CreateProductReq struct {

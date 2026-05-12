@@ -10,6 +10,7 @@ import (
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
 	"github.com/avnpl/go-march/utils"
+	"github.com/avnpl/go-march/utils/customErrors"
 	"github.com/avnpl/go-march/utils/log"
 	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
@@ -31,7 +32,15 @@ func (h OrderHandler) RegisterRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.createOrder(w, r)
 		default:
-			utils.SendJSONError(w, http.StatusMethodNotAllowed, "Invalid HTTP Method")
+			SendErrorResponse(r.Context(), w, customErrors.InvalidHTTPMethod)
+		}
+	})
+	mux.HandleFunc("/orders/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.fetchOrderByID(w, r)
+		default:
+			SendErrorResponse(r.Context(), w, customErrors.InvalidHTTPMethod)
 		}
 	})
 }
@@ -68,7 +77,6 @@ func (h OrderHandler) createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	order, err := h.svc.Create(ctx, req)
-
 	if err != nil {
 		log.Error(ctx, h.logger, "CreateOrder failed", zap.Error(err))
 		SendErrorResponse(ctx, w, err)
@@ -77,5 +85,27 @@ func (h OrderHandler) createOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(order)
+}
+
+func (oh OrderHandler) fetchOrderByID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	idStr := r.PathValue("id")
+	if idStr == "" {
+		utils.SendJSONError(w, http.StatusBadRequest, "No ID provided in the request")
+		return
+	}
+
+	log.Debug(ctx, oh.logger, "fetching order", zap.String("id", idStr))
+	order, err := oh.svc.FetchByID(ctx, idStr)
+	if err != nil {
+		log.Error(ctx, oh.logger, "fetchOrderByID failed", zap.Error(err))
+		SendErrorResponse(ctx, w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(order)
 }

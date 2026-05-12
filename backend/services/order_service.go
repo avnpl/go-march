@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,7 +17,7 @@ import (
 
 type OrderService interface {
 	Create(ctx context.Context, req models.CreateOrderReq) (models.Order, error)
-	Fetch()
+	FetchByID(ctx context.Context, id string) (models.Order, error)
 	FetchAll()
 	Delete()
 }
@@ -30,7 +32,7 @@ func NewOrderService(orderRepo repos.OrderRepo, productRepo repos.ProductRepo, l
 	return &orderService{orderRepo: orderRepo, productRepo: productRepo, log: l}
 }
 
-func (o *orderService) Create(ctx context.Context, req models.CreateOrderReq) (models.Order, error) {
+func (os *orderService) Create(ctx context.Context, req models.CreateOrderReq) (models.Order, error) {
 
 	order := models.Order{
 		OrderID:         utils.GenerateID("OR"),
@@ -44,10 +46,10 @@ func (o *orderService) Create(ctx context.Context, req models.CreateOrderReq) (m
 		Status:          "success",
 	}
 
-	txn, err := o.productRepo.BeginTransaction()
+	txn, err := os.productRepo.BeginTransaction()
 	defer txn.Rollback()
 
-	product, err := o.productRepo.FetchByID(txn, ctx, order.ProductID)
+	product, err := os.productRepo.FetchByID(txn, ctx, order.ProductID)
 	if err != nil {
 		return models.Order{}, fmt.Errorf("order_service.Create: %w", err)
 	}
@@ -65,12 +67,12 @@ func (o *orderService) Create(ctx context.Context, req models.CreateOrderReq) (m
 		return models.Order{}, customErrors.FailedTransaction
 	}
 
-	err = o.productRepo.UpdateProductStock(txn, ctx, product.ProductID, product.Stock-order.Quantity)
+	err = os.productRepo.UpdateProductStock(txn, ctx, product.ProductID, product.Stock-order.Quantity)
 	if err != nil {
 		return models.Order{}, fmt.Errorf("order_service.Create: %w", err)
 	}
 
-	res, err := o.orderRepo.Create(txn, ctx, order)
+	res, err := os.orderRepo.Create(txn, ctx, order)
 	if err != nil {
 		return models.Order{}, fmt.Errorf("order_service.Create: %w", err)
 	}
@@ -79,18 +81,26 @@ func (o *orderService) Create(ctx context.Context, req models.CreateOrderReq) (m
 		return models.Order{}, fmt.Errorf("order_service.Create: commit failed: %w", err)
 	}
 
-	log.Info(ctx, o.log, "created order", zap.String("order_id", res.OrderID))
+	log.Info(ctx, os.log, "created order", zap.String("order_id", res.OrderID))
 	return res, nil
 }
 
-func (o *orderService) Delete() {
+func (os *orderService) FetchByID(ctx context.Context, id string) (models.Order, error) {
+	order, err := os.orderRepo.FetchByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Order{}, customErrors.RecordNotFound
+		}
+
+		return models.Order{}, fmt.Errorf("order_service.FetchByID failed: %w", err)
+	}
+	return order, nil
+}
+
+func (os *orderService) FetchAll() {
 	panic("unimplemented")
 }
 
-func (o *orderService) Fetch() {
-	panic("unimplemented")
-}
-
-func (o *orderService) FetchAll() {
+func (os *orderService) Delete() {
 	panic("unimplemented")
 }

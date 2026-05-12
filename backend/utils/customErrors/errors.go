@@ -17,6 +17,7 @@ type errorHttpMapping struct {
 
 var (
 	InvalidRequest    = errors.New("Invalid Request")
+	InvalidHTTPMethod = errors.New("Invalid HTTP Method")
 	RecordNotFound    = errors.New("Record Not Found")
 	OutOfStock        = errors.New("Out of Stock")
 	IncorrectAmount   = errors.New("Incorrect Amount")
@@ -27,6 +28,7 @@ var (
 var errRegistry = []errorHttpMapping{
 	{OutOfStock, http.StatusBadRequest},
 	{InvalidRequest, http.StatusBadRequest},
+	{InvalidHTTPMethod, http.StatusMethodNotAllowed},
 	{RecordNotFound, http.StatusBadRequest},
 	{IncorrectAmount, http.StatusBadRequest},
 	{FailedTransaction, http.StatusBadRequest},

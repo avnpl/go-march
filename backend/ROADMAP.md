@@ -20,14 +20,15 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 Phase 7   User Authentication ─────────── token-based auth with middleware
 ```
 
-**Current status**: Product CRUD functional. Orders/payments not started.
+**Current status**: Product CRUD complete. Order creation functional. Remaining: order GET/PATCH, payments.
 
 ## Progress Summary
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **Phase 1.1** | ✅ Complete | Product CRUD with routes (`/products`, `/products/{id}`) + pagination |
-| **Phase 1.2-1.4** | ⬜ Not Started | Orders, payments, payment simulation |
+| **Phase 1.2** | 🔶 Partial | `POST /orders` + `GET /orders/{id}` done; GET list + PATCH remaining |
+| **Phase 1.3-1.4** | ⬜ Not Started | Payments, order update |
 | **Phase 2** | 🔶 Minimal | GraphQL has products only |
 | **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket stubs |
 | **Phase 6** | ⬜ Not Started | TTL, README |
@@ -145,21 +146,21 @@ Phase 7   User Authentication ─────────── token-based auth
 ## 1.2 Complete Orders CRUD
 
 **Endpoints**:
-- [ ] `POST /orders` — create order (decrements stock)
+- [x] `POST /orders` — create order (decrements stock)
 - [ ] `GET /orders` — list orders *(with pagination; same style as `GET /products`)*
-- [ ] `GET /orders/{id}` — get single order
+- [x] `GET /orders/{id}` — get single order
 - [ ] `PATCH /orders/{id}` — update (address, notes ONLY)
 
 **Business logic**:
-- [ ] Validate product exists and has sufficient stock
-- [ ] Decrement stock on order creation
-- [ ] Auto-set order status based on payment (handled later)
-- [ ] Generate `OR-XXXXXX` ID in service layer on create
+- [x] Validate product exists and has sufficient stock
+- [x] Decrement stock on order creation
+- [x] Auto-set order status based on payment (handled later)
+- [x] Generate `OR-XXXXXX` ID in service layer on create
 
 **Create order — pending / incomplete** (handler or service may exist before this is finished; implement end-to-end in service + repo layers):
-- [ ] **Stock check**: before insert, ensure `products.stock >= quantity`; reject when insufficient (prevents overselling under concurrency when combined with transactional update below).
-- [ ] **Stock decrement**: update `products.stock` (subtract `quantity`) in the **same transaction** as inserting the order row so both succeed or both roll back.
-- [ ] **Error mapping** (do not expose internal DB messages): product missing → **404**; insufficient stock → **409 Conflict** (or **422 Unprocessable Entity**, project-wide pick one); invalid body / `quantity <= 0` → **400**; transaction / unexpected failures → **500** with generic client message.
+- [x] **Stock check**: before insert, ensure `products.stock >= quantity`; reject when insufficient (prevents overselling under concurrency when combined with transactional update below).
+- [x] **Stock decrement**: update `products.stock` (subtract `quantity`) in the **same transaction** as inserting the order row so both succeed or both roll back.
+- [x] **Error mapping** (do not expose internal DB messages): product missing → **404**; insufficient stock → **409 Conflict** (or **422 Unprocessable Entity**, project-wide pick one); invalid body / `quantity <= 0` → **400**; transaction / unexpected failures → **500** with generic client message.
 - [ ] Optional later: retries, idempotency keys, or row-level locking strategy if contention shows up in tests.
 
 ## 1.3 Complete Payments API
@@ -554,6 +555,7 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 ```
 /products         POST, GET (list)
 /products/{id}    GET, PATCH, DELETE
+/orders           POST (create with stock decrement)
 /graphql          POST
 ```
 

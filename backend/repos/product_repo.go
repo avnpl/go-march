@@ -23,16 +23,16 @@ type ProductRepo interface {
 	BeginTransaction() (*sqlx.Tx, error)
 }
 
-type pgProductRepo struct {
+type productRepo struct {
 	db     *sqlx.DB
 	logger *zap.Logger
 }
 
-func NewPGProductRepo(db *sqlx.DB, logger *zap.Logger) ProductRepo {
-	return pgProductRepo{db: db, logger: logger}
+func NewProductRepo(db *sqlx.DB, logger *zap.Logger) ProductRepo {
+	return productRepo{db: db, logger: logger}
 }
 
-func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
+func (r productRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
 	const query = "insert into products (prod_id, prod_name, price, stock) values ($1, $2, $3, $4) returning *"
 
 	var res models.Product
@@ -43,7 +43,7 @@ func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Pr
 	return res, nil
 }
 
-func (r pgProductRepo) FetchByID(txn *sqlx.Tx, ctx context.Context, id string) (models.Product, error) {
+func (r productRepo) FetchByID(txn *sqlx.Tx, ctx context.Context, id string) (models.Product, error) {
 	const query = "select * from products where prod_id = $1"
 
 	var result models.Product
@@ -62,7 +62,7 @@ func (r pgProductRepo) FetchByID(txn *sqlx.Tx, ctx context.Context, id string) (
 	return result, nil
 }
 
-func (r pgProductRepo) FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error) {
+func (r productRepo) FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error) {
 	query := "select * from products limit $1"
 
 	if limit == 0 {
@@ -86,7 +86,7 @@ func (r pgProductRepo) FetchAll(ctx context.Context, limit int, offset int) ([]m
 	return result, nil
 }
 
-func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error) {
+func (r productRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error) {
 	query := "update products set "
 	args := make(map[string]interface{})
 	var fieldsToUpdate []string
@@ -134,7 +134,7 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	return res, nil
 }
 
-func (r pgProductRepo) DeleteByID(ctx context.Context, id string) (models.Product, error) {
+func (r productRepo) DeleteByID(ctx context.Context, id string) (models.Product, error) {
 	const query = "delete from products where prod_id = $1 returning *"
 
 	log.Debug(ctx, r.logger, "deleting product", zap.String("prod_id", id))
@@ -148,7 +148,7 @@ func (r pgProductRepo) DeleteByID(ctx context.Context, id string) (models.Produc
 	return result, nil
 }
 
-func (r pgProductRepo) UpdateProductStock(txn *sqlx.Tx, ctx context.Context, id string, stock int) error {
+func (r productRepo) UpdateProductStock(txn *sqlx.Tx, ctx context.Context, id string, stock int) error {
 	const query = "update products set stock = $1 where prod_id = $2"
 
 	_, err := txn.ExecContext(ctx, query, stock, id)
@@ -159,6 +159,6 @@ func (r pgProductRepo) UpdateProductStock(txn *sqlx.Tx, ctx context.Context, id 
 	return nil
 }
 
-func (r pgProductRepo) BeginTransaction() (*sqlx.Tx, error) {
+func (r productRepo) BeginTransaction() (*sqlx.Tx, error) {
 	return r.db.Beginx()
 }
