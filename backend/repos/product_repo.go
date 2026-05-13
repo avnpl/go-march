@@ -63,7 +63,7 @@ func (r productRepo) FetchByID(txn *sqlx.Tx, ctx context.Context, id string) (mo
 }
 
 func (r productRepo) FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error) {
-	query := "select * from products limit $1"
+	query := "select * from products order by created_at desc limit $1"
 
 	if limit == 0 {
 		limit = utils.GetEnvVarInteger("FETCH_ALL_PRODS_DEFAULT_LIMIT", 10, r.logger)

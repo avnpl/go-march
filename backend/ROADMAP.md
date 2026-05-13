@@ -20,15 +20,15 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 Phase 7   User Authentication ─────────── token-based auth with middleware
 ```
 
-**Current status**: Product CRUD complete. Order creation functional. Remaining: order GET/PATCH, payments.
+**Current status**: Product CRUD complete. Order CRUD complete.
 
 ## Progress Summary
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **Phase 1.1** | ✅ Complete | Product CRUD with routes (`/products`, `/products/{id}`) + pagination |
-| **Phase 1.2** | 🔶 Partial | `POST /orders` + `GET /orders/{id}` done; GET list + PATCH remaining |
-| **Phase 1.3-1.4** | ⬜ Not Started | Payments, order update |
+| **Phase 1.2** | ✅ Complete | Order CRUD: POST, GET list, GET by ID. No PATCH/DELETE/Payments. |
+| **Phase 1.3-1.4** | N/A | Out of scope — no payments, no order update/delete |
 | **Phase 2** | 🔶 Minimal | GraphQL has products only |
 | **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket stubs |
 | **Phase 6** | ⬜ Not Started | TTL, README |
@@ -147,9 +147,8 @@ Phase 7   User Authentication ─────────── token-based auth
 
 **Endpoints**:
 - [x] `POST /orders` — create order (decrements stock)
-- [ ] `GET /orders` — list orders *(with pagination; same style as `GET /products`)*
+- [x] `GET /orders` — list orders *(with pagination; same style as `GET /products`)*
 - [x] `GET /orders/{id}` — get single order
-- [ ] `PATCH /orders/{id}` — update (address, notes ONLY)
 
 **Business logic**:
 - [x] Validate product exists and has sufficient stock
@@ -162,32 +161,6 @@ Phase 7   User Authentication ─────────── token-based auth
 - [x] **Stock decrement**: update `products.stock` (subtract `quantity`) in the **same transaction** as inserting the order row so both succeed or both roll back.
 - [x] **Error mapping** (do not expose internal DB messages): product missing → **404**; insufficient stock → **409 Conflict** (or **422 Unprocessable Entity**, project-wide pick one); invalid body / `quantity <= 0` → **400**; transaction / unexpected failures → **500** with generic client message.
 - [ ] Optional later: retries, idempotency keys, or row-level locking strategy if contention shows up in tests.
-
-## 1.3 Complete Payments API
-
-**Endpoints** (no refunds):
-- [ ] `POST /payments` — create payment (simulate authorize)
-- [ ] `GET /payments/{id}` — get payment status
-- [ ] Link payment to order via `order_id`
-- [ ] Generate `PA-XXXXXX` ID in service layer on create
-
-## Payment simulation
-
-- [ ] Payment fails if card number ends in "6969"
-- [ ] All other card numbers succeed (deterministic for testing)
-- [ ] Atomic operation: create payment + set order status in single transaction
-- [ ] Payment status = "success" → Order status = "paid"
-- [ ] Payment status = "failed" → Order status = "failed"
-
-## 1.4 Order Update Scope
-
-**Only these fields updatable**:
-- `shipping_address`
-- `notes`
-
-**Not updatable** (automatic or admin only):
-- `status` — set by payment flow
-- `delivery_date` — out of scope
 
 ---
 
@@ -555,7 +528,8 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 ```
 /products         POST, GET (list)
 /products/{id}    GET, PATCH, DELETE
-/orders           POST (create with stock decrement)
+/orders           POST, GET (list)
+/orders/{id}      GET
 /graphql          POST
 ```
 
@@ -564,9 +538,7 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 /products         GET, POST
 /products/{id}    GET, PATCH, DELETE
 /orders           GET, POST
-/orders/{id}      GET, PATCH
-/payments         POST
-/payments/{id}    GET
+/orders/{id}      GET
 /graphql          POST
 ```
 

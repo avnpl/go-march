@@ -18,7 +18,7 @@ import (
 type OrderService interface {
 	Create(ctx context.Context, req models.CreateOrderReq) (models.Order, error)
 	FetchByID(ctx context.Context, id string) (models.Order, error)
-	FetchAll()
+	FetchAll(ctx context.Context, limit int, offset int) ([]models.Order, error)
 	Delete()
 }
 
@@ -97,8 +97,17 @@ func (os *orderService) FetchByID(ctx context.Context, id string) (models.Order,
 	return order, nil
 }
 
-func (os *orderService) FetchAll() {
-	panic("unimplemented")
+func (os *orderService) FetchAll(ctx context.Context, limit int, offset int) ([]models.Order, error) {
+	if limit == 0 {
+		limit = utils.GetEnvVarInteger("FETCH_ALL_ORDERS_DEFAULT_LIMIT", 10, os.log)
+	}
+
+	res, err := os.orderRepo.FetchAll(ctx, limit, offset)
+	if err != nil {
+		log.Error(ctx, os.log, "failed to fetch orders", zap.Error(err))
+		return res, fmt.Errorf("order_service.FetchAll: %w", err)
+	}
+	return res, nil
 }
 
 func (os *orderService) Delete() {

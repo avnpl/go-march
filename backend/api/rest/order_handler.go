@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/avnpl/go-march/models"
@@ -31,6 +32,8 @@ func (h OrderHandler) RegisterRoutes(mux *http.ServeMux) {
 		switch r.Method {
 		case http.MethodPost:
 			h.createOrder(w, r)
+		case http.MethodGet:
+			h.fetchAllOrders(w, r)
 		default:
 			SendErrorResponse(r.Context(), w, customErrors.InvalidHTTPMethod)
 		}
@@ -108,4 +111,43 @@ func (oh OrderHandler) fetchOrderByID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(order)
+}
+
+func (oh OrderHandler) fetchAllOrders(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	queryParams := r.URL.Query()
+	limit := 0
+	offset := 0
+	limitStr := queryParams.Get("limit")
+	offsetStr := queryParams.Get("offset")
+	var err error
+
+	if limitStr != "" {
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil {
+			log.Error(ctx, oh.logger, "Invalid query param, limit", zap.String("limit", limitStr), zap.Error(err))
+			utils.SendJSONError(w, http.StatusBadRequest, "Invalid query param, limit")
+			return
+		}
+	}
+
+	if offsetStr != "" {
+		offset, err = strconv.Atoi(offsetStr)
+		if err != nil {
+			log.Error(ctx, oh.logger, "Invalid query param, offset", zap.String("offset", offsetStr), zap.Error(err))
+			utils.SendJSONError(w, http.StatusBadRequest, "Invalid query param, offset")
+			return
+		}
+	}
+
+	prods, err := oh.svc.FetchAll(ctx, limit, offset)
+	if err != nil {
+		log.Error(ctx, oh.logger, "FetchAllOrders failed", zap.Int("limit", limit), zap.Int("offset", offset), zap.Error(err))
+		utils.SendInternalError(w)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(prods)
 }

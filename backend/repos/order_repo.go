@@ -13,7 +13,7 @@ import (
 type OrderRepo interface {
 	Create(txn *sqlx.Tx, ctx context.Context, order models.Order) (models.Order, error)
 	FetchByID(ctx context.Context, id string) (models.Order, error)
-	FetchAll()
+	FetchAll(ctx context.Context, limit int, offset int) ([]models.Order, error)
 	Delete()
 }
 
@@ -48,8 +48,25 @@ func (or orderRepo) FetchByID(ctx context.Context, id string) (models.Order, err
 	return res, nil
 }
 
-func (or orderRepo) FetchAll() {
-	panic("unimplemented")
+func (or orderRepo) FetchAll(ctx context.Context, limit int, offset int) ([]models.Order, error) {
+	query := "select * from orders order by created_at desc limit $1"
+
+	args := []interface{}{limit}
+
+	if offset != 0 {
+		query += " offset $2"
+		args = append(args, offset)
+	}
+
+	log.Debug(ctx, or.logger, "fetching all orders", zap.Int("limit", limit), zap.Int("offset", offset))
+
+	var result []models.Order
+	err := or.db.SelectContext(ctx, &result, query, args...)
+	if err != nil {
+		log.Error(ctx, or.logger, "failed to fetch all orders", zap.Error(err))
+		return result, fmt.Errorf("order_repo.FetchAllOrders: %w", err)
+	}
+	return result, nil
 }
 
 func (or orderRepo) Delete() {
