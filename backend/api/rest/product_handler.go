@@ -143,7 +143,7 @@ func (h ProductHandler) fetchAllProducts(w http.ResponseWriter, r *http.Request)
 	}
 
 	if offsetStr != "" {
-		offset, err = strconv.Atoi(limitStr)
+		offset, err = strconv.Atoi(offsetStr)
 		if err != nil {
 			log.Error(ctx, h.logger, "Invalid query param, offset", zap.String("offset", offsetStr), zap.Error(err))
 			utils.SendJSONError(w, http.StatusBadRequest, "Invalid query param, offset")
