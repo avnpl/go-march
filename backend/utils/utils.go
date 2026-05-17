@@ -1,9 +1,10 @@
 package utils
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"log"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"os"
 	"strconv"
@@ -133,7 +134,8 @@ func GenerateID(prefix string) string {
 	result.WriteString("-")
 
 	for range 7 {
-		result.WriteByte(charSet[rand.Intn(36)])
+		n, _ := rand.Int(rand.Reader, big.NewInt(36))
+		result.WriteByte(charSet[n.Int64()])
 	}
 
 	return result.String()

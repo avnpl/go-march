@@ -109,7 +109,7 @@ func (r productRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq)
 
 	fieldsToUpdate = append(fieldsToUpdate, "updated_at = NOW()")
 	query += strings.Join(fieldsToUpdate, ", ")
-	query += " WHERE prod_id = :prod_id RETURNING *"
+	query += " where prod_id = :prod_id returning *"
 	args["prod_id"] = p.ProductID
 
 	log.Debug(ctx, r.logger, "updating product", zap.String("prod_id", p.ProductID))

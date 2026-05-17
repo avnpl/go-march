@@ -29,7 +29,7 @@ var errRegistry = []errorHttpMapping{
 	{OutOfStock, http.StatusBadRequest},
 	{InvalidRequest, http.StatusBadRequest},
 	{InvalidHTTPMethod, http.StatusMethodNotAllowed},
-	{RecordNotFound, http.StatusBadRequest},
+	{RecordNotFound, http.StatusNotFound},
 	{IncorrectAmount, http.StatusBadRequest},
 	{FailedTransaction, http.StatusBadRequest},
 }

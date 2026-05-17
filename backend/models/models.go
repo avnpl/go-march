@@ -47,5 +47,5 @@ type CreateOrderReq struct {
 	Amount          float64 `json:"amount" validate:"required,gt=0"`
 	ShippingAddress string  `json:"shippingAddress" validate:"required"`
 	Notes           string  `json:"notes,omitempty"`
-	CardNumber      string  `json:"card_num" validate:"required,numeric,len=16"`
+	CardNumber      string  `json:"card_num" validate:"required,numeric,len=4"`
 }
