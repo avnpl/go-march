@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/avnpl/go-march/models"
@@ -47,18 +48,21 @@ func (s *orderService) Create(ctx context.Context, req models.CreateOrderReq) (m
 	}
 
 	txn, err := s.productRepo.BeginTransaction()
-	defer txn.Rollback()
+	if err != nil {
+		return models.Order{}, fmt.Errorf("order_service.Create: begin txn: %w", err)
+	}
+	defer func() {
+		_ = txn.Rollback()
+	}()
 
 	product, err := s.productRepo.FetchByID(txn, ctx, order.ProductID)
 	if err != nil {
 		return models.Order{}, fmt.Errorf("order_service.Create: %w", err)
 	}
 
-	if product.Stock < order.Quantity {
-		return models.Order{}, customErrors.OutOfStock
-	}
-
-	if order.Amount != product.Price*float64(order.Quantity) {
+	const epsilon = 0.005
+	expected := product.Price * float64(order.Quantity)
+	if math.Abs(order.Amount - expected) >= epsilon {
 		return models.Order{}, customErrors.IncorrectAmount
 	}
 
@@ -66,7 +70,7 @@ func (s *orderService) Create(ctx context.Context, req models.CreateOrderReq) (m
 		return models.Order{}, customErrors.FailedTransaction
 	}
 
-	err = s.productRepo.UpdateProductStock(txn, ctx, product.ProductID, product.Stock-order.Quantity)
+	_, err = s.productRepo.DecrementStock(txn, ctx, product.ProductID, order.Quantity)
 	if err != nil {
 		return models.Order{}, fmt.Errorf("order_service.Create: %w", err)
 	}

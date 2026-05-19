@@ -3,11 +3,13 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/utils"
+	"github.com/avnpl/go-march/utils/customErrors"
 	"github.com/avnpl/go-march/utils/log"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
@@ -19,7 +21,7 @@ type ProductRepo interface {
 	FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error)
 	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id string) (models.Product, error)
-	UpdateProductStock(txn *sqlx.Tx, ctx context.Context, id string, stock int) error
+	DecrementStock(txn *sqlx.Tx, ctx context.Context, id string, qty int) (int, error)
 	BeginTransaction() (*sqlx.Tx, error)
 }
 
@@ -148,15 +150,19 @@ func (r productRepo) DeleteByID(ctx context.Context, id string) (models.Product,
 	return result, nil
 }
 
-func (r productRepo) UpdateProductStock(txn *sqlx.Tx, ctx context.Context, id string, stock int) error {
-	const query = "update products set stock = $1 where prod_id = $2"
+func (r productRepo) DecrementStock(txn *sqlx.Tx, ctx context.Context, id string, qty int) (int, error) {
+	const query = "update products set stock = stock - $1 where prod_id = $2 and stock >= $1 returning stock"
 
-	_, err := txn.ExecContext(ctx, query, stock, id)
-	if err != nil {
-		log.Error(ctx, r.logger, "failed to decrement count", zap.String("prod_id", id), zap.Error(err))
-		return fmt.Errorf("product_repo.UpdateProductStock : %w", err)
+	var newStock int
+	err := txn.GetContext(ctx, &newStock, query, qty, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, customErrors.OutOfStock
 	}
-	return nil
+	if err != nil {
+		log.Error(ctx, r.logger, "failed to decrement stock", zap.String("prod_id", id), zap.Error(err))
+		return 0, fmt.Errorf("product_repo.DecrementStock: %w", err)
+	}
+	return newStock, nil
 }
 
 func (r productRepo) BeginTransaction() (*sqlx.Tx, error) {

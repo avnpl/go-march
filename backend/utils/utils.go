@@ -97,10 +97,12 @@ func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
 		logger.Fatal("db connect failed", zap.Error(err))
 	}
 
-	lifetime := GetEnvVarInteger("DB_MAX_CONN_LIFETIME_SEC", 10, logger)
+	lifetime := GetEnvVarInteger("DB_MAX_CONN_LIFETIME_MINS", 30, logger)
+	idletime := GetEnvVarInteger("DB_MAX_CONN_IDLETIME_MINS", 5, logger)
 	db.SetMaxOpenConns(GetEnvVarInteger("DB_MAX_OPEN_CONNS", 25, logger))
 	db.SetMaxIdleConns(GetEnvVarInteger("DB_MAX_IDLE_CONNS", 10, logger))
-	db.SetConnMaxLifetime(time.Duration(lifetime) * time.Second)
+	db.SetConnMaxLifetime(time.Duration(lifetime) * time.Minute)
+	db.SetConnMaxIdleTime(time.Duration(idletime) * time.Minute)
 	if err := db.Ping(); err != nil {
 		logger.Fatal("db ping failed", zap.Error(err))
 	}

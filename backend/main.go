@@ -56,9 +56,13 @@ func main() {
 
 	port := utils.GetEnvVarString("PORT", "8013", logger)
 
+	// Middlewares
+	handler := utils.LimitBodySize(1 << 20)(mux)
+	handler = utils.RequestIDMiddleware(handler)
+
 	server := &http.Server{
 		Addr:         ":" + port,
-		Handler:      utils.RequestIDMiddleware(mux),
+		Handler:      handler,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,

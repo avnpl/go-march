@@ -1,7 +1,7 @@
 # Final Code Audit Report — go-march Backend
 
 **Auditor:** Synthesized verdict over four independent reviews (`ring-2-6`, `deepseek`, `opus-cursor`, `minimax`), with every finding re-checked against the current code on `p1/rest-completion` @ `661c925`.
-**Date:** 2026-05-14
+**Date:** 2026-05-19
 **Scope:** All Go source, SQL migrations, and `go.mod` under `backend/`.
 
 This document is the single source of truth. Each finding lists exact file paths and line numbers verified in-tree, the problem, its impact, the recommended fix, an improved example, and a confidence level. Findings are ordered by severity — fix them top-down.
@@ -12,38 +12,31 @@ This document is the single source of truth. Each finding lists exact file paths
 
 ## Overall Assessment
 
-`go-march` is an early-stage learning backend with a sound layered architecture (handlers → services → repositories) and a clear intent to demonstrate five API styles sharing one service layer. The product CRUD path is mostly functional. There is a nil-pointer panic in the order creation flow, monetary equality compared in `float64`, a read-modify-write stock decrement vulnerable to overselling, and zero automated tests.
+`go-march` is an early-stage learning backend with a sound layered architecture (handlers → services → repositories) and a clear intent to demonstrate five API styles sharing one service layer. The product CRUD path is mostly functional. There are zero automated tests.
 
 The codebase reads cleanly and follows many Go idioms (context propagation, wrapped errors, structured logging, dependency injection), but it is not deployable in its current state.
 
 ## Main Risks
 
-1. Concurrent orders can oversell stock (no `FOR UPDATE`, no atomic decrement).
-2. Float-equality check on `order.Amount` rejects legitimate orders.
-3. Zero test coverage — none of the above would be caught by CI.
-4. No request body size cap; trivial OOM DoS via `io.ReadAll`.
-5. Inconsistent not-found handling across product handlers (#7).
-6. GraphQL resolvers swallow input errors as `(nil, nil)` (#10).
-7. No pagination bounds on `limit`/`offset` (#13).
+1. Zero test coverage — none of the above would be caught by CI.
+2. Inconsistent not-found handling across product handlers (#7).
+3. GraphQL resolvers swallow input errors as `(nil, nil)` (#10).
+4. No pagination bounds on `limit`/`offset` (#13).
 
 ## Production Readiness Score: **2/10**
 
 The application would fail the very first realistic order request, would crash on any DB hiccup, and would not pass a basic security review.
 
-## Top 10 Critical Findings (capsule)
+## Top 8 Critical Findings (capsule)
 
 | # | Finding | Severity |
 |---|---------|----------|
-| 1 | Float-equality monetary comparison rejects valid orders | Critical |
-| 2 | Stock decrement race condition under concurrency (overselling) | Critical |
-| 3 | Zero tests in the repository | Critical |
-| 4 | `io.ReadAll(r.Body)` everywhere — unbounded body read, OOM DoS | High |
-| 5 | GraphQL resolvers swallow input errors as `(nil, nil)` | High |
-| 6 | No pagination bounds on `limit`/`offset` | High |
-| 7 | `GetEnvVarInteger` silently falls back on parse error | High |
-| 8 | `DB_MAX_CONN_LIFETIME_SEC` defaults to 10 seconds | High |
-| 9 | No health/readiness endpoint | Medium |
-| 10 | `select *` everywhere — fragile to schema evolution | Medium |
+| 1 | Zero tests in the repository | Critical |
+| 2 | GraphQL resolvers swallow input errors as `(nil, nil)` | High |
+| 3 | No pagination bounds on `limit`/`offset` | High |
+| 4 | `GetEnvVarInteger` silently falls back on parse error | High |
+| 5 | No health/readiness endpoint | Medium |
+| 6 | `select *` everywhere — fragile to schema evolution | Medium |
 
 ## Technical Debt Assessment
 
@@ -55,162 +48,6 @@ Heavy. The architecture is sound, but the implementation has correctness, securi
 
 ---
 
-## 1. [CRITICAL] Nil-pointer panic — `defer txn.Rollback()` runs before error check
-
-### Location
-`services/order_service.go:36-37`
-
-```go
-txn, err := os.productRepo.BeginTransaction()
-defer txn.Rollback()
-```
-
-### Problem
-`BeginTransaction()` (`repos/product_repo.go:162-164`) calls `r.db.Beginx()`, which returns `(nil, err)` whenever the pool is exhausted, the DB is unreachable, or the OS context aborts the connection. Because `defer txn.Rollback()` is registered before `err` is checked, the deferred call dereferences a nil `*sqlx.Tx` and panics. Go's `net/http` does not recover panics on a per-request basis (it logs and continues), but every in-flight request on that goroutine is lost and the process is left in an undefined state.
-
-Note: this is *not* the same as "defer Rollback after Commit is a bug." Calling `Rollback()` after a successful `Commit()` on a non-nil `*sqlx.Tx` returns `sql.ErrTxDone` and is harmless and idiomatic. The bug is strictly the nil-pointer case.
-
-### Impact
-Any transient database failure during order creation (pool exhaustion under load, brief network blip, CockroachDB maintenance) panics the goroutine. Combined with the lack of request body limits (finding #4) and zero rate limiting, a flood of requests during a DB blip will cascade.
-
-### Recommendation
-Check the error first, then defer.
-
-### Improved Example
-```go
-txn, err := os.productRepo.BeginTransaction()
-if err != nil {
- return models.Order{}, fmt.Errorf("order_service.Create: begin txn: %w", err)
-}
-defer func() { _ = txn.Rollback() }() // post-Commit returns ErrTxDone, harmless
-```
-
-Combine with finding #15 to also accept a `context.Context` in `BeginTransaction` so the transaction inherits the request's cancellation.
-
-### Confidence: **High**
-
----
-
-## 2. [CRITICAL] Float equality for monetary amount
-
-### Location
-`services/order_service.go:60`
-
-```go
-if order.Amount != product.Price*float64(order.Quantity) {
- return models.Order{}, customErrors.IncorrectAmount
-}
-```
-
-### Problem
-Both `Price` and `Amount` are `float64`. IEEE-754 representation of decimals is approximate. `19.99 * 3` evaluates to `59.97000000000001`, not `59.97`. A client that correctly multiplies and sends `59.97` will be rejected with `IncorrectAmount`.
-
-### Impact
-Legitimate orders intermittently fail. Customers see a "wrong amount" error when their math was right. The failure pattern depends on the price values, so it manifests unpredictably.
-
-### Recommendation
-Store and compare cents as `int64` end-to-end (preferred), or compare with an epsilon at the boundary. Long-term, switch to a decimal library (`shopspring/decimal`) and a `DECIMAL` column type.
-
-### Improved Example
-```go
-// Quick fix — epsilon comparison
-const epsilon = 0.005 // half a cent
-expected := product.Price * float64(order.Quantity)
-if math.Abs(order.Amount-expected) > epsilon {
- return models.Order{}, customErrors.IncorrectAmount
-}
-
-// Long-term — integer cents
-type Product struct {
- PriceCents int64 `db:"price_cents" json:"price_cents"`
-}
-```
-
-### Confidence: **High**
-
----
-
-## 3. [CRITICAL] Stock decrement race — overselling under concurrent orders
-
-### Location
-- `services/order_service.go:39-72` — read stock, check stock, write stock-quantity
-- `repos/product_repo.go:151-159` — `UpdateProductStock` does `update products set stock = $1`
-
-### Problem
-The order flow is:
-1. `FetchByID` reads the current stock (no `FOR UPDATE`, no advisory lock).
-2. Check `product.Stock < order.Quantity`.
-3. `UpdateProductStock(ctx, id, product.Stock-order.Quantity)`.
-
-All three happen inside one transaction, but the lock acquired by a plain `SELECT` in CockroachDB does not block another concurrent transaction's `SELECT`. Two requests for the last unit both read `stock = 1`, both pass the check, both write `stock = 0`. One order goes through that should not have. With higher quantities, stock can go negative.
-
-### Impact
-E-commerce overselling. You promise inventory you don't have. Customers get charged for items that won't ship.
-
-### Recommendation
-Use a single atomic conditional UPDATE that decrements only if there is enough stock, and rely on the returned row count.
-
-### Improved Example
-```go
-// repos/product_repo.go
-func (r productRepo) DecrementStock(ctx context.Context, txn *sqlx.Tx, id string, qty int) (int, error) {
- const query = `update products set stock = stock - $1
- where prod_id = $2 and stock >= $1
- returning stock`
- var newStock int
- err := txn.GetContext(ctx, &newStock, query, qty, id)
- if errors.Is(err, sql.ErrNoRows) {
- return 0, customErrors.OutOfStock
- }
- if err != nil {
- return 0, fmt.Errorf("product_repo.DecrementStock: %w", err)
- }
- return newStock, nil
-}
-```
-
-Then in `orderService.Create` drop the read-check-write pattern entirely — let the SQL be the single source of truth.
-
-### Confidence: **High**
-
----
-
-## 4. [HIGH] No request body size limit — trivial OOM DoS
-
-### Location
-- `api/rest/product_handler.go:60, 177` — `io.ReadAll(r.Body)`
-- `api/rest/order_handler.go:54` — same
-- `api/graphql/handler.go:36` — same
-
-### Problem
-`io.ReadAll` consumes the entire body into memory with no upper bound. The HTTP server's `ReadTimeout = 5*time.Second` is not a useful defence — a fast client can stream hundreds of MB in five seconds. A single unauthenticated request can OOM-kill the process.
-
-### Impact
-One curl with a multi-GB body crashes the server. Repeat for amplification.
-
-### Recommendation
-Wrap `r.Body` in `http.MaxBytesReader` before reading. Apply at the handler level (best for per-route limits) or as middleware (simpler).
-
-### Improved Example
-```go
-const maxBodySize = 1 << 20 // 1 MB
-
-func (h ProductHandler) createProduct(w http.ResponseWriter, r *http.Request) {
- r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
- var req models.CreateProductReq
- if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
- utils.SendJSONError(w, http.StatusBadRequest, "Invalid or oversized JSON")
- return
- }
- // ...
-}
-```
-
-While there, also drop the `io.ReadAll → string → bytes.NewReader → json.Decode` round-trip — decode directly from `r.Body` once body logging is removed ().
-
-### Confidence: **High**
-
----
 
 ## 5. [HIGH] `FormatValidationErrors` is buggy in three ways
 
@@ -421,7 +258,7 @@ Every endpoint is anonymous:
 - `POST /orders` — anyone can place orders with arbitrary card data.
 - `/graphql` — full read/write on products.
 
-No rate limiting, so combined with finding #4 a single attacker can OOM the server or brute-force ID enumeration. No CORS, so browser frontends can't call the API at all.
+No rate limiting, so a single attacker can brute-force ID enumeration. No CORS, so browser frontends can't call the API at all.
 
 ### Impact
 - Catalog tampering, data exfiltration, fraudulent orders.
@@ -617,32 +454,6 @@ Apply ctx-first to all transaction-aware methods:
 - `repos/order_repo.go:14` — same pattern for `Create`.
 
 `go vet` and most linters require `ctx` first.
-
-### Confidence: **High**
-
----
-
-## 15. [HIGH] `DB_MAX_CONN_LIFETIME_SEC` defaults to 10 seconds
-
-### Location
-`utils/utils.go:102` — `lifetime := GetEnvVarInteger("DB_MAX_CONN_LIFETIME_SEC", 10, logger)`
-
-### Problem
-A 10-second max lifetime means every connection is recycled every 10 seconds. With pool max 25, that's 2.5 new TCP+TLS handshakes per second against CockroachDB Cloud (which mandates `sslmode=verify-full`). The driver also doesn't pre-warm — connection creation happens on demand.
-
-### Impact
-- Latency spikes after each cohort of connection expirations.
-- Unnecessary load on the DB authentication path.
-- TLS handshake CPU overhead.
-
-### Recommendation
-Default to 5–30 minutes. Add `SetConnMaxIdleTime` so idle connections still get reaped without churning hot ones.
-
-### Improved Example
-```go
-db.SetConnMaxLifetime(30 * time.Minute)
-db.SetConnMaxIdleTime(5 * time.Minute)
-```
 
 ### Confidence: **High**
 
@@ -861,7 +672,7 @@ Also add `{Conflict, http.StatusConflict}` to `errRegistry`.
 - Order creation transaction (`services/order_service.go:Create`) has no per-step timeout.
 
 ### Problem
-A slow query inside an active transaction holds a pool connection and a row lock. Under load this cascades — when the pool is exhausted other requests queue, the HTTP write timeout fires, but the goroutine remains until the DB returns. Combined with `DB_MAX_CONN_LIFETIME_SEC=10` (#15), the pool churns and starves.
+A slow query inside an active transaction holds a pool connection and a row lock. Under load this cascades — when the pool is exhausted other requests queue, the HTTP write timeout fires, but the goroutine remains until the DB returns.
 
 ### Recommendation
 Wrap each repo call (or the transaction body) in `context.WithTimeout`.
@@ -1032,22 +843,20 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 
 # Concurrency Assessment
 
-**Score: 3/10**
+**Score: 6/10**
 
 **Strengths**
 - HTTP server has `ReadTimeout`, `WriteTimeout`, `IdleTimeout`.
 - DB pool is configured (max open/idle, lifetime).
 - No bespoke goroutines; nothing to leak.
 - Context plumbed through every layer.
-
-**Critical issues**
-- Nil-pointer panic on `defer txn.Rollback()` (#1). This is the dominant concurrency risk: any pool exhaustion under load cascades into panics.
-- Stock decrement read-modify-write race (#3). Two concurrent orders for the last unit both succeed.
+- Nil-pointer panic on `defer txn.Rollback()` — **FIXED**.
+- Stock decrement race — **FIXED** (atomic conditional UPDATE).
+- DB connection lifetime — **FIXED** (30 min default, max idle time configured).
 
 **Other issues**
 - `BeginTransaction` doesn't accept a context (#14).
 - No per-step timeouts in services or repos (#22).
-- `DB_MAX_CONN_LIFETIME_SEC=10` causes connection churn under load (#15).
 - No goroutine or thread cap; `debug.SetMaxThreads` not used.
 
 ---
@@ -1060,15 +869,14 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 1. Full PAN stored, logged, and serialized in JSON .
 2. Plaintext PAN in `payments.card_number` migration and seed data .
 3. No authentication or authorization (#9).
-4. Unbounded request body read (#4).
-5. Request bodies logged at debug .
+4. Request bodies logged at debug .
 
 **High**
-6. `SendErrorResponse` leaks internal error chain .
-7. No rate limiting (#9).
-8. `math/rand` for IDs — predictability concern, not catastrophic, but worth fixing.
-9. Negative pagination accepted (#13).
-10. No request size limits or query complexity limits on GraphQL.
+5. `SendErrorResponse` leaks internal error chain .
+6. No rate limiting (#9).
+7. `math/rand` for IDs — predictability concern, not catastrophic, but worth fixing.
+8. Negative pagination accepted (#13).
+9. No request size limits or query complexity limits on GraphQL.
 
 **Medium**
 11. No CORS .
@@ -1088,7 +896,6 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 - Zap is a high-performance logger (once it's not in development mode).
 
 **Weaknesses**
-- `DB_MAX_CONN_LIFETIME_SEC=10` (#15) causes connection churn.
 - `select *` everywhere (#23) over-fetches.
 - Per-request env var read in `repos/product_repo.go:69` and `services/order_service.go:101`.
 - Per-call `logger.With(...)` allocation (#27).
@@ -1130,7 +937,7 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 - No `*_test.go` files exist anywhere.
 - No mocks, fixtures, helpers, or testdata.
 - No CI signal — `go test ./...` is a no-op.
-- The most expensive bugs in this report (#1, #2, #5, #6, #12, #13, #15) would all be caught by a single passing service-layer test each.
+- The most expensive bugs in this report (#5, #6, #12, #13) would all be caught by a single passing service-layer test each.
 
 **Priority test targets**
 1. `services/order_service.go` — the broken-by-design module.
@@ -1146,39 +953,33 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 | Rank | Task | Severity | Estimated Effort |
 |------|------|----------|------------------|
 | 1 | Align Order model ↔ migration; move card data to `payments` | Critical | 1–2 h |
-| 2 | Fix `defer txn.Rollback()` nil panic; add ctx to `BeginTransaction` | Critical | 30 min |
-| 3 | Remove plaintext PAN storage and all body logging | Critical | 1 h |
-| 4 | Fix stock decrement to atomic conditional UPDATE | Critical | 30 min |
-| 5 | Replace float equality with integer cents (or epsilon as quick fix) | Critical | 30 min – 1 d |
-| 6 | Remove `panic("unimplemented")` in `Delete` methods | Critical | 15 min |
-| 7 | Add service-layer table-driven tests (Create, OutOfStock, NotFound, Update zero-value) | Critical | 1–2 d |
-| 8 | Add `http.MaxBytesReader` and pagination bounds in all handlers | High | 1 h |
-| 9 | Gate logger by `ENV`; switch to JSON in production | High | 30 min |
-| 10 | Map `RecordNotFound → 404`; unify error handling across handlers | High | 1 h |
-| 11 | Rewrite `FormatValidationErrors` (type-safe, multi-error, tag-aware) | High | 30 min |
-| 12 | Refactor transactions out of `ProductRepo` interface (context-bound `TxManager`) | Medium | 2–4 h |
-| 13 | Split `utils` into focused packages; rename `customErrors` → `apperrors` | Medium | 2 h |
-| 14 | Add health check, rate limiting, CORS, and basic auth | Medium | 1 d |
-| 15 | Integrate migration runner; add `.down.sql` files; add FK indexes | Medium | 1 d |
-| 16 | Replace `select *` with explicit columns; replace `math/rand` IDs with `xid` | Low | 1 h |
-| 17 | Update `zap` and other deps; commit `go.sum` | Low | 30 min |
+| 2 | Remove plaintext PAN storage and all body logging | Critical | 1 h |
+| 3 | Remove `panic("unimplemented")` in `Delete` methods | Critical | 15 min |
+| 4 | Add service-layer table-driven tests (Create, OutOfStock, NotFound, Update zero-value) | Critical | 1–2 d |
+| 5 | Gate logger by `ENV`; switch to JSON in production | High | 30 min |
+| 6 | Map `RecordNotFound → 404`; unify error handling across handlers | High | 1 h |
+| 7 | Add pagination bounds on `limit`/`offset` | High | 1 h |
+| 8 | Rewrite `FormatValidationErrors` (type-safe, multi-error, tag-aware) | High | 30 min |
+| 9 | Refactor transactions out of `ProductRepo` interface (context-bound `TxManager`) | Medium | 2–4 h |
+| 10 | Split `utils` into focused packages; rename `customErrors` → `apperrors` | Medium | 2 h |
+| 11 | Add health check, rate limiting, CORS, and basic auth | Medium | 1 d |
+| 12 | Integrate migration runner; add `.down.sql` files; add FK indexes | Medium | 1 d |
+| 13 | Replace `select *` with explicit columns; replace `math/rand` IDs with `xid` | Low | 1 h |
+| 14 | Update `zap` and other deps; commit `go.sum` | Low | 30 min |
 
 ---
 
 # Quick Wins
 
-1. **Fix `defer txn.Rollback()` nil panic** — 2 lines (`services/order_service.go:36-37`).
-2. **`RecordNotFound → 404`** — 1 line (`utils/customErrors/errors.go:32`).
-3. **Delete raw-body debug logs** — ~15 lines across three handlers.
-4. **Add `http.MaxBytesReader`** — 3 lines per handler.
-5. **Delete `utils/constants.go`** — 1 file.
-6. **Replace `"failed to fetch order: %w"`** literal with proper zap fields (`repos/order_repo.go:45`).
-7. **Make GraphQL `DeleteProductInput.prod_id` non-null** — 1 line.
-8. **Return errors from GraphQL resolvers instead of `nil, nil`** — ~8 lines.
-9. **Use `customErrors.RecordNotFound` (not `sql.ErrNoRows`) in `deleteProduct`** — 3 lines.
-10. **Remove the `"6969"` magic check** — 4 lines (`services/order_service.go:65-68`).
-11. **Increase `DB_MAX_CONN_LIFETIME_SEC` default to 1800** — 1 line.
-12. **`server.Shutdown(ctx)` error logged** — 3 lines.
+1. **`RecordNotFound → 404`** — 1 line (`utils/customErrors/errors.go:32`).
+2. **Delete raw-body debug logs** — ~15 lines across three handlers.
+3. **Delete `utils/constants.go`** — 1 file.
+4. **Replace `"failed to fetch order: %w"`** literal with proper zap fields (`repos/order_repo.go:45`).
+5. **Make GraphQL `DeleteProductInput.prod_id` non-null** — 1 line.
+6. **Return errors from GraphQL resolvers instead of `nil, nil`** — ~8 lines.
+7. **Use `customErrors.RecordNotFound` (not `sql.ErrNoRows`) in `deleteProduct`** — 3 lines.
+8. **Remove the `"6969"` magic check** — 4 lines (`services/order_service.go:65-68`).
+9. **`server.Shutdown(ctx)` error logged** — 3 lines.
 
 ---
 
@@ -1204,40 +1005,34 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 | # | Fix | Severity | Effort |
 |---|-----|----------|--------|
 | 1 | Align `Order` model with migration; remove `CardNumber` from orders | Critical | 1 h |
-| 2 | Fix nil-pointer panic on `BeginTransaction` failure | Critical | 5 min |
-| 3 | Remove plaintext PAN storage and all raw-body logging | Critical | 1 h |
-| 4 | Atomic stock decrement to prevent overselling | Critical | 30 min |
-| 5 | Add a basic service-layer test suite | Critical | 1–2 d |
+| 2 | Remove plaintext PAN storage and all raw-body logging | Critical | 1 h |
+| 3 | Add a basic service-layer test suite | Critical | 1–2 d |
 
 # Top 5 Easiest Wins
 
 | # | Fix | Effort |
 |---|-----|--------|
-| 1 | Fix nil `defer txn.Rollback()` | 1 line |
-| 2 | `RecordNotFound → 404` | 1 line |
-| 3 | Delete raw-body debug logs | ~15 lines |
-| 4 | Add `http.MaxBytesReader` per handler | 3 lines each |
+| 1 | `RecordNotFound → 404` | 1 line |
+| 2 | Delete raw-body debug logs | ~15 lines |
+| 3 | Delete `utils/constants.go` | 1 file |
+| 4 | `server.Shutdown(ctx)` error logged | 3 lines |
 | 5 | Remove `"6969"` magic | 4 lines |
 
 # Top 5 Scalability Concerns
 
 | # | Concern | Impact |
 |---|---------|--------|
-| 1 | Read-modify-write stock decrement (#3) | Overselling; can't scale concurrent writes |
-| 2 | `DB_MAX_CONN_LIFETIME_SEC=10` (#15) | Connection storms under load |
-| 3 | No caching, every read hits CockroachDB | DB-bound at scale |
-| 4 | No FK indexes | Full-scan joins as orders grow |
-| 5 | No request body size or `limit` cap (#8, #21) | OOM under malicious or accidental large requests |
+| 1 | No caching, every read hits CockroachDB | DB-bound at scale |
+| 2 | No FK indexes | Full-scan joins as orders grow |
+| 3 | Offset-based pagination is O(n) at large offsets | Degraded UX as tables grow |
 
-# Top 5 Reliability Concerns
+# Top 3 Reliability Concerns
 
 | # | Concern | Impact |
 |---|---------|--------|
-| 1 | Nil-pointer panic on transaction begin (#1) | Outage on transient DB hiccup |
-| 2 | `panic("unimplemented")` Delete methods | Future route silently lands a crash |
-| 3 | Order model ↔ schema drift | Orders subsystem 100% broken |
-| 4 | No health/readiness endpoint (#20) | Orchestrators route traffic to broken instances |
-| 5 | Dev-mode logger in production | DPanic surprises; log file fills disk |
+| 1 | `panic("unimplemented")` Delete methods | Future route silently lands a crash |
+| 2 | Order model ↔ schema drift | Orders subsystem 100% broken |
+| 3 | No health/readiness endpoint (#20) | Orchestrators route traffic to broken instances |
 
 ---
 
