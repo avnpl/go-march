@@ -99,14 +99,14 @@ func (r productRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq)
 		args["prod_name"] = p.Name
 	}
 
-	if p.Stock != 0 {
+	if p.Stock != nil {
 		fieldsToUpdate = append(fieldsToUpdate, "stock = :stock")
-		args["stock"] = p.Stock
+		args["stock"] = *p.Stock
 	}
 
-	if p.Price != 0.0 {
+	if p.Price != nil {
 		fieldsToUpdate = append(fieldsToUpdate, "price = :price")
-		args["price"] = p.Price
+		args["price"] = *p.Price
 	}
 
 	fieldsToUpdate = append(fieldsToUpdate, "updated_at = NOW()")

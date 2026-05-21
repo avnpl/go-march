@@ -88,11 +88,11 @@ func (r *Resolver) UpdateProduct(p graphql.ResolveParams) (interface{}, error) {
 	}
 
 	if price, ok := input["price"].(float64); ok {
-		req.Price = price
+		req.Price = &price
 	}
 
 	if stock, ok := input["stock"].(int); ok {
-		req.Stock = stock
+		req.Stock = &stock
 	}
 
 	ctx := p.Context

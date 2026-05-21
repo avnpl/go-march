@@ -27,16 +27,15 @@ The codebase reads cleanly and follows many Go idioms (context propagation, wrap
 
 The application would fail the very first realistic order request, would crash on any DB hiccup, and would not pass a basic security review.
 
-## Top 8 Critical Findings (capsule)
+## Top 6 Critical Findings (capsule)
 
 | # | Finding | Severity |
 |---|---------|----------|
 | 1 | Zero tests in the repository | Critical |
-| 2 | GraphQL resolvers swallow input errors as `(nil, nil)` | High |
-| 3 | No pagination bounds on `limit`/`offset` | High |
-| 4 | `GetEnvVarInteger` silently falls back on parse error | High |
-| 5 | No health/readiness endpoint | Medium |
-| 6 | `select *` everywhere — fragile to schema evolution | Medium |
+| 2 | No pagination bounds on `limit`/`offset` | High |
+| 3 | `GetEnvVarInteger` silently falls back on parse error | High |
+| 4 | No health/readiness endpoint | Medium |
+| 5 | `select *` everywhere — fragile to schema evolution | Medium |
 
 ## Technical Debt Assessment
 
@@ -48,124 +47,6 @@ Heavy. The architecture is sound, but the implementation has correctness, securi
 
 ---
 
-
-## 5. [HIGH] `FormatValidationErrors` is buggy in three ways
-
-### Location
-`utils/validations.go:9-20`
-
-```go
-func FormatValidationErrors(err error) string {
- var message string
- for _, e := range err.(validator.ValidationErrors) {
- switch e.Tag() {
- case "required":
- message = fmt.Sprintf("%s is required", e.StructField())
- default:
- message = "Invalid Request"
- }
- }
- return message
-}
-```
-
-### Problem
-Three defects in twelve lines:
-1. **Unchecked type assertion** — `err.(validator.ValidationErrors)` panics if the validator ever returns `*validator.InvalidValidationError` (e.g., from passing a non-struct to `validate.Struct`).
-2. **Only the last error survives** — `message =` overwrites each iteration. Multi-field failures collapse to one message.
-3. **Only `required` is recognised** — `gt`, `min`, `len`, `numeric`, `omitempty` (all used in `CreateOrderReq` and `CreateProductReq`) fall through to `"Invalid Request"`. Clients can't tell "quantity must be > 0" from "card number must be 16 chars."
-
-### Impact
-- Server can panic on a misconfigured validator.
-- UX is terrible — users iterate one error at a time.
-- The validator tags in `models.go` (`gt=0`, `min=0`, `numeric`, `len=16`) are effectively wasted.
-
-### Recommendation
-Use `errors.As`, accumulate all errors, and handle the tags actually in use.
-
-### Improved Example
-```go
-func FormatValidationErrors(err error) string {
- var ve validator.ValidationErrors
- if !errors.As(err, &ve) {
- return "Invalid Request"
- }
- msgs := make([]string, 0, len(ve))
- for _, e := range ve {
- switch e.Tag() {
- case "required":
- msgs = append(msgs, fmt.Sprintf("%s is required", e.StructField()))
- case "gt":
- msgs = append(msgs, fmt.Sprintf("%s must be greater than %s", e.StructField(), e.Param()))
- case "min":
- msgs = append(msgs, fmt.Sprintf("%s must be at least %s", e.StructField(), e.Param()))
- case "len":
- msgs = append(msgs, fmt.Sprintf("%s must be exactly %s characters", e.StructField(), e.Param()))
- case "numeric":
- msgs = append(msgs, fmt.Sprintf("%s must be numeric", e.StructField()))
- default:
- msgs = append(msgs, fmt.Sprintf("%s is invalid", e.StructField()))
- }
- }
- return strings.Join(msgs, "; ")
-}
-```
-
-### Confidence: **High**
-
----
-
-## 6. [HIGH] `UpdateByID` cannot set `stock` or `price` to zero
-
-### Location
-`repos/product_repo.go:100-108`
-
-```go
-if p.Stock != 0 {
- fieldsToUpdate = append(fieldsToUpdate, "stock = :stock")
- args["stock"] = p.Stock
-}
-if p.Price != 0.0 {
- fieldsToUpdate = append(fieldsToUpdate, "price = :price")
- args["price"] = p.Price
-}
-```
-
-### Problem
-Treats the zero value as "not provided." But zero is a valid state for `Stock` (sold out) and arguably for `Price` (free promotion). With the current code the API accepts a `PATCH` with `stock: 0`, validation passes (`min=0,omitempty` allows zero), and the repo silently drops the field — endpoint returns 200, nothing changed.
-
-### Impact
-- Cannot mark products as out-of-stock via the API.
-- Silent data loss; no error is returned.
-- The handler returns the row, but the row reflects the prior `stock` value, so even client-side reconciliation looks weird.
-
-### Recommendation
-Use pointer fields in `UpdateProductReq` so the JSON decoder can distinguish "absent" from "present-and-zero." Update the repo accordingly.
-
-### Improved Example
-```go
-// models/models.go
-type UpdateProductReq struct {
- ProductID string `json:"prod_id" validate:"required"`
- Name *string `json:"name,omitempty"`
- Price *float64 `json:"price,omitempty" validate:"omitempty,gte=0"`
- Stock *int `json:"stock,omitempty" validate:"omitempty,min=0"`
-}
-
-// repos/product_repo.go
-if p.Stock != nil {
- fieldsToUpdate = append(fieldsToUpdate, "stock = :stock")
- args["stock"] = *p.Stock
-}
-if p.Price != nil {
- fieldsToUpdate = append(fieldsToUpdate, "price = :price")
- args["price"] = *p.Price
-}
-```
-
-### Confidence: **High**
-
----
 
 ## 7. [HIGH] Inconsistent not-found handling across product handlers
 
@@ -937,13 +818,12 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 - No `*_test.go` files exist anywhere.
 - No mocks, fixtures, helpers, or testdata.
 - No CI signal — `go test ./...` is a no-op.
-- The most expensive bugs in this report (#5, #6, #12, #13) would all be caught by a single passing service-layer test each.
+- The most expensive bugs in this report (#10, #12, #13) would all be caught by a single passing service-layer test each.
 
 **Priority test targets**
 1. `services/order_service.go` — the broken-by-design module.
 2. `utils/customErrors/errors.go` — error → HTTP status mapping (covers #11).
-3. `utils/validations.go` — error formatter (covers #12).
-4. `api/rest/product_handler.go` and `order_handler.go` — handler error paths.
+3. `api/rest/product_handler.go` and `order_handler.go` — handler error paths.
 5. `repos/product_repo.go` integration — query correctness against a test DB (catches #1-style drift).
 
 ---
@@ -959,13 +839,12 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 | 5 | Gate logger by `ENV`; switch to JSON in production | High | 30 min |
 | 6 | Map `RecordNotFound → 404`; unify error handling across handlers | High | 1 h |
 | 7 | Add pagination bounds on `limit`/`offset` | High | 1 h |
-| 8 | Rewrite `FormatValidationErrors` (type-safe, multi-error, tag-aware) | High | 30 min |
-| 9 | Refactor transactions out of `ProductRepo` interface (context-bound `TxManager`) | Medium | 2–4 h |
-| 10 | Split `utils` into focused packages; rename `customErrors` → `apperrors` | Medium | 2 h |
-| 11 | Add health check, rate limiting, CORS, and basic auth | Medium | 1 d |
-| 12 | Integrate migration runner; add `.down.sql` files; add FK indexes | Medium | 1 d |
-| 13 | Replace `select *` with explicit columns; replace `math/rand` IDs with `xid` | Low | 1 h |
-| 14 | Update `zap` and other deps; commit `go.sum` | Low | 30 min |
+| 8 | Refactor transactions out of `ProductRepo` interface (context-bound `TxManager`) | Medium | 2–4 h |
+| 9 | Split `utils` into focused packages; rename `customErrors` → `apperrors` | Medium | 2 h |
+| 10 | Add health check, rate limiting, CORS, and basic auth | Medium | 1 d |
+| 11 | Integrate migration runner; add `.down.sql` files; add FK indexes | Medium | 1 d |
+| 12 | Replace `select *` with explicit columns; replace `math/rand` IDs with `xid` | Low | 1 h |
+| 13 | Update `zap` and other deps; commit `go.sum` | Low | 30 min |
 
 ---
 
