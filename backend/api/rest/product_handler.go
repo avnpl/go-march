@@ -2,7 +2,6 @@ package rest
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -206,12 +205,8 @@ func (h ProductHandler) updateProduct(w http.ResponseWriter, r *http.Request) {
 
 	prod, err := h.svc.UpdateProduct(ctx, &req)
 	if err != nil {
-		if errors.Is(err, customErrors.Conflict) {
-			utils.SendJSONError(w, http.StatusConflict, "")
-			return
-		}
-		utils.SendInternalError(w)
 		log.Error(ctx, h.logger, "UpdateProduct failed", zap.Error(err))
+		SendErrorResponse(ctx, w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -233,12 +228,8 @@ func (h ProductHandler) deleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	prod, err := h.svc.DeleteProduct(ctx, idStr)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			utils.SendJSONError(w, http.StatusNotFound, "Record with given ID not found")
-			return
-		}
 		log.Error(ctx, h.logger, "DeleteProductByID failed", zap.Error(err))
-		utils.SendInternalError(w)
+		SendErrorResponse(ctx, w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -42,8 +42,8 @@ func (or orderRepo) FetchByID(ctx context.Context, id string) (models.Order, err
 
 	var res models.Order
 	if err := or.db.GetContext(ctx, &res, query, id); err != nil {
-		log.Error(ctx, or.logger, "failed to fetch order: %w", zap.Error(err))
-		return models.Order{}, err
+		log.Error(ctx, or.logger, "failed to fetch order", zap.String("id", id), zap.Error(err))
+		return models.Order{}, fmt.Errorf("order_repo.FetchByID: %w", err)
 	}
 	return res, nil
 }

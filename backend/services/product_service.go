@@ -74,6 +74,9 @@ func (s *productService) GetAllProducts(ctx context.Context, limit int, offset i
 func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdateProductReq) (models.Product, error) {
 	res, err := s.repo.UpdateByID(ctx, req)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Product{}, customErrors.RecordNotFound
+		}
 		log.Error(ctx, s.log, "failed to update product", zap.String("prod_id", req.ProductID), zap.Error(err))
 		return models.Product{}, fmt.Errorf("product_service.Update: %w", err)
 	}
@@ -84,6 +87,9 @@ func (s *productService) UpdateProduct(ctx context.Context, req *models.UpdatePr
 func (s *productService) DeleteProduct(ctx context.Context, id string) (models.Product, error) {
 	res, err := s.repo.DeleteByID(ctx, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Product{}, customErrors.RecordNotFound
+		}
 		log.Error(ctx, s.log, "failed to delete product", zap.String("id", id), zap.Error(err))
 		return models.Product{}, fmt.Errorf("prod_service.Delete: %w", err)
 	}

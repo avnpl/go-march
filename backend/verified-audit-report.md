@@ -19,9 +19,8 @@ The codebase reads cleanly and follows many Go idioms (context propagation, wrap
 ## Main Risks
 
 1. Zero test coverage — none of the above would be caught by CI.
-2. Inconsistent not-found handling across product handlers (#7).
-3. GraphQL resolvers swallow input errors as `(nil, nil)` (#10).
-4. No pagination bounds on `limit`/`offset` (#13).
+2. GraphQL resolvers swallow input errors as `(nil, nil)` (#10).
+3. No pagination bounds on `limit`/`offset` (#13).
 
 ## Production Readiness Score: **2/10**
 
@@ -44,87 +43,6 @@ Heavy. The architecture is sound, but the implementation has correctness, securi
 ---
 
 # Detailed Findings
-
----
-
-
-## 7. [HIGH] Inconsistent not-found handling across product handlers
-
-### Location
-- `api/rest/product_handler.go:115-117` — `fetchProduct` calls `SendErrorResponse(ctx, w, err)` ✓ (uses sentinel registry)
-- `api/rest/product_handler.go:236-239` — `deleteProduct` checks `errors.Is(err, sql.ErrNoRows)` directly
-- `api/rest/product_handler.go:215-225` — `updateProduct` checks neither `RecordNotFound` nor `sql.ErrNoRows`; returns 500 for missing product
-- `services/product_service.go:42-50` — `GetProductByID` converts `sql.ErrNoRows → RecordNotFound`
-- `services/product_service.go:81-86` — `UpdateProduct` does **not** convert; passes wrapped `sql.ErrNoRows` through (note `repos/product_repo.go:124` does wrap it explicitly with `%w`)
-- `services/product_service.go:88-93` — `DeleteProduct` does **not** convert either
-
-### Problem
-Three handlers handle "not found" three different ways. `updateProduct` returns 500 when the product doesn't exist. `deleteProduct` checks the wrong sentinel (`sql.ErrNoRows` instead of `customErrors.RecordNotFound`) — it works only because the wrap chain preserves `sql.ErrNoRows`, but it bypasses the central error registry.
-
-### Impact
-- Inconsistent client experience: same condition, three different status codes.
-- Future maintainers will copy the wrong pattern.
-- Centralised error mapping is undermined.
-
-### Recommendation
-1. In every service method, convert `sql.ErrNoRows` to `customErrors.RecordNotFound`.
-2. In every handler, use `SendErrorResponse` and let the registry decide the status.
-
-### Improved Example
-```go
-// services/product_service.go — UpdateProduct
-res, err := s.repo.UpdateByID(ctx, req)
-if err != nil {
- if errors.Is(err, sql.ErrNoRows) {
- return models.Product{}, customErrors.RecordNotFound
- }
- return models.Product{}, fmt.Errorf("product_service.Update: %w", err)
-}
-
-// api/rest/product_handler.go — updateProduct / deleteProduct
-prod, err := h.svc.UpdateProduct(ctx, &req)
-if err != nil {
- SendErrorResponse(ctx, w, err)
- return
-}
-```
-
-### Confidence: **High**
-
----
-
-## 8. [HIGH] `order_repo.FetchByID` returns unwrapped error and logs `%w` literal
-
-### Location
-`repos/order_repo.go:42-48`
-
-```go
-if err := or.db.GetContext(ctx, &res, query, id); err != nil {
- log.Error(ctx, or.logger, "failed to fetch order: %w", zap.Error(err))
- return models.Order{}, err
-}
-```
-
-### Problem
-Two issues:
-1. The error is returned without wrapping, breaking the codebase's `"pkg.Method: %w"` convention. Callers can still match `sql.ErrNoRows` via `errors.Is`, but the chain has no context.
-2. `"failed to fetch order: %w"` is a `fmt.Errorf` format string in a zap message slot. Zap treats the message as a literal — the log line will contain a literal `%w`.
-
-### Impact
-- Log message is garbled.
-- Repo-level error context is lost in production logs.
-
-### Recommendation
-```go
-if err := or.db.GetContext(ctx, &res, query, id); err != nil {
- log.Error(ctx, or.logger, "failed to fetch order", zap.String("id", id), zap.Error(err))
- return models.Order{}, fmt.Errorf("order_repo.FetchByID: %w", err)
-}
-```
-
-While there, fix the trailing space in `repos/product_repo.go:157` — `"product_repo.UpdateProductStock : %w"` has a stray space before the colon.
-
-### Confidence: **High**
 
 ---
 
@@ -800,7 +718,6 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 **Weaknesses**
 - **Zero tests** — the single biggest maintainability hole.
 - Schema/code drift on orders means the source of truth is unclear.
-- Inconsistent error handling across product handlers (#7).
 - Dead code (`Conflict` checks #35, `utils/constants.go` #49, panic'd `Delete` methods #4).
 - Inconsistent receiver patterns (value vs pointer; `os` shadowing in `orderService` #40).
 - Mixed SQL casing .
@@ -837,14 +754,13 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 | 3 | Remove `panic("unimplemented")` in `Delete` methods | Critical | 15 min |
 | 4 | Add service-layer table-driven tests (Create, OutOfStock, NotFound, Update zero-value) | Critical | 1–2 d |
 | 5 | Gate logger by `ENV`; switch to JSON in production | High | 30 min |
-| 6 | Map `RecordNotFound → 404`; unify error handling across handlers | High | 1 h |
-| 7 | Add pagination bounds on `limit`/`offset` | High | 1 h |
-| 8 | Refactor transactions out of `ProductRepo` interface (context-bound `TxManager`) | Medium | 2–4 h |
-| 9 | Split `utils` into focused packages; rename `customErrors` → `apperrors` | Medium | 2 h |
-| 10 | Add health check, rate limiting, CORS, and basic auth | Medium | 1 d |
-| 11 | Integrate migration runner; add `.down.sql` files; add FK indexes | Medium | 1 d |
-| 12 | Replace `select *` with explicit columns; replace `math/rand` IDs with `xid` | Low | 1 h |
-| 13 | Update `zap` and other deps; commit `go.sum` | Low | 30 min |
+| 6 | Add pagination bounds on `limit`/`offset` | High | 1 h |
+| 7 | Refactor transactions out of `ProductRepo` interface (context-bound `TxManager`) | Medium | 2–4 h |
+| 8 | Split `utils` into focused packages; rename `customErrors` → `apperrors` | Medium | 2 h |
+| 9 | Add health check, rate limiting, CORS, and basic auth | Medium | 1 d |
+| 10 | Integrate migration runner; add `.down.sql` files; add FK indexes | Medium | 1 d |
+| 11 | Replace `select *` with explicit columns; replace `math/rand` IDs with `xid` | Low | 1 h |
+| 12 | Update `zap` and other deps; commit `go.sum` | Low | 30 min |
 
 ---
 
@@ -853,12 +769,10 @@ Decide intent. Either add `syscall.SIGQUIT` to the slice (graceful), or leave it
 1. **`RecordNotFound → 404`** — 1 line (`utils/customErrors/errors.go:32`).
 2. **Delete raw-body debug logs** — ~15 lines across three handlers.
 3. **Delete `utils/constants.go`** — 1 file.
-4. **Replace `"failed to fetch order: %w"`** literal with proper zap fields (`repos/order_repo.go:45`).
-5. **Make GraphQL `DeleteProductInput.prod_id` non-null** — 1 line.
-6. **Return errors from GraphQL resolvers instead of `nil, nil`** — ~8 lines.
-7. **Use `customErrors.RecordNotFound` (not `sql.ErrNoRows`) in `deleteProduct`** — 3 lines.
-8. **Remove the `"6969"` magic check** — 4 lines (`services/order_service.go:65-68`).
-9. **`server.Shutdown(ctx)` error logged** — 3 lines.
+4. **Make GraphQL `DeleteProductInput.prod_id` non-null** — 1 line.
+5. **Return errors from GraphQL resolvers instead of `nil, nil`** — ~8 lines.
+6. **Remove the `"6969"` magic check** — 4 lines (`services/order_service.go:65-68`).
+7. **`server.Shutdown(ctx)` error logged** — 3 lines.
 
 ---
 
