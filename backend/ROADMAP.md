@@ -1,6 +1,6 @@
 # Go March Backend — Development Roadmap
 
-> **Concept**: A JSONPlaceholder-style learning API demonstrating 5 different API styles in Go. Users can test and learn REST, GraphQL, SOAP, gRPC, and WebSocket by interacting with a simple inventory/order system.
+> **Concept**: A JSONPlaceholder-style learning API demonstrating 4 different API styles in Go. Users can test and learn REST, GraphQL, gRPC, and WebSocket by interacting with a simple inventory/order system.
 >
 > **Architecture**: Layered design (handlers → services → repos) where service and repo layers are API-agnostic. All API styles share the same business logic.
 
@@ -13,11 +13,10 @@ Each API style demonstrates its strengths. No duplication of CRUD across APIs.
 ```
 Phase 1   REST Completion ────────────── complete end-to-end flow (products + orders + payments)
 Phase 2   GraphQL Enhancement ─────────── orders + nested products
-Phase 3   SOAP Implementation ────────── payment transactions
-Phase 4   gRPC Analytics ──────────────── high-perf aggregations
-Phase 5   WebSocket Real-time ──────────── notifications
-Phase 6   Cleanup + Documentation ─────── reset mechanism + README
-Phase 7   User Authentication ─────────── token-based auth with middleware
+Phase 3   gRPC Analytics ──────────────── high-perf aggregations
+Phase 4   WebSocket Real-time ──────────── notifications
+Phase 5   Cleanup + Documentation ─────── reset mechanism + README
+Phase 6   User Authentication ─────────── token-based auth with middleware
 ```
 
 **Current status**: Product CRUD complete. Order CRUD complete.
@@ -30,9 +29,9 @@ Phase 7   User Authentication ─────────── token-based auth
 | **Phase 1.2** | ✅ Complete | Order CRUD: POST, GET list, GET by ID. No PATCH/DELETE/Payments. |
 | **Phase 1.3-1.4** | N/A | Out of scope — no payments, no order update/delete |
 | **Phase 2** | 🔶 Minimal | GraphQL has products only |
-| **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket stubs |
-| **Phase 6** | ⬜ Not Started | TTL, README |
-| **Phase 7** | ⬜ TODO | User authentication with middleware (after Phase 6) |
+| **Phase 3-4** | ⬜ Not Started | gRPC, WebSocket stubs |
+| **Phase 5** | ⬜ Not Started | TTL, README |
+| **Phase 6** | ⬜ TODO | User authentication with middleware (after Phase 5) |
 
 **Legend**: ✅ Complete | 🔶 In Progress | ⬜ Not Started
 
@@ -40,7 +39,7 @@ Phase 7   User Authentication ─────────── token-based auth
 
 ## Data Models
 
-### After Phase 7 (with auth)
+### After Phase 6 (with auth)
 
 ### Product (current)
 - `prod_id` (string) — format: `PR-XXXXXX` (primary key)
@@ -83,7 +82,6 @@ Phase 7   User Authentication ─────────── token-based auth
 |-----|-----------|---------|----------------------|
 | REST | Products + Orders + Payments | Complete CRUD + full flow | Standard REST patterns |
 | GraphQL | Orders (with nested products) | Filtering + nested queries | Flexible data fetching |
-| SOAP | Payments | Transaction operations | XML contracts |
 | gRPC | Analytics | Aggregations | High-performance streaming |
 | WebSocket | Notifications | Real-time events | Push updates |
 
@@ -214,55 +212,7 @@ type Product {
 
 ---
 
-# Phase 3: SOAP Implementation
-
-## 3.1 SOAP Endpoints
-
-**Purpose**: Payment transactions with strict XML contracts. Demonstrates enterprise/XML patterns.
-
-**Operations**:
-- [ ] `PlaceOrder` — create order + process payment atomically
-- [ ] `GetPaymentStatus` — retrieve payment details
-
-## 3.2 XML Schema
-
-**SOAP Envelope Structure**:
-```xml
-<soap:Envelope>
-  <soap:Header>
-    <!-- optional auth -->
-  </soap:Header>
-  <soap:Body>
-    <PlaceOrderRequest>
-      <product_id>123</product_id>
-      <quantity>2</quantity>
-      <shipping_address>123 Main St</shipping_address>
-      <payment>
-        <card_number>4111111111111111</card_number>
-        <expiry>12/25</expiry>
-      </payment>
-    </PlaceOrderRequest>
-  </soap:Body>
-</soap:Envelope>
-```
-
-## 3.3 Implementation
-
-- [ ] XML structs with `encoding/xml` tags
-- [ ] `SOAPAction` header handling
-- [ ] SOAP Fault for errors
-- [ ] Reuse `OrderService` + `PaymentService` (shared layer)
-- [ ] Endpoint: `POST /soap`
-
-## 3.4 Payment Simulation
-
-- [ ] Simulate authorization (success/failure)
-- [ ] Return appropriate SOAP response
-- [ ] Link order + payment in database
-
----
-
-# Phase 4: gRPC Analytics
+# Phase 3: gRPC Analytics
 
 ## 4.1 Protocol Buffer Definition
 
@@ -304,16 +254,16 @@ message ProductStat {
 - [ ] Implement gRPC server in `api/grpc/`
 - [ ] Run on separate port (`:50051`)
 
-## 4.3 Streaming (Optional)
+## 3.3 Streaming (Optional)
 
 - [ ] Server-side streaming for top products / low stock
 - [ ] Demonstrates gRPC streaming capability
 
 ---
 
-# Phase 5: WebSocket Real-time
+# Phase 4: WebSocket Real-time
 
-## 5.1 WebSocket Architecture
+## 4.1 WebSocket Architecture
 
 **Library**: `nhooyr.io/websocket` (context-aware, modern)
 
@@ -322,7 +272,7 @@ message ProductStat {
 - `broadcast` — channel for messages
 - `register/unregister` — channels for connection lifecycle
 
-## 5.2 Events
+## 4.2 Events
 
 **Subscription topics**:
 - [ ] `orders` — new order created
@@ -341,7 +291,7 @@ message ProductStat {
 }
 ```
 
-## 5.3 Integration
+## 4.3 Integration
 
 - [ ] Create `hub` struct with run loop
 - [ ] HTTP upgrade handler at `/ws`
@@ -351,9 +301,9 @@ message ProductStat {
 
 ---
 
-# Phase 6: Cleanup + Documentation
+# Phase 5: Cleanup + Documentation
 
-## 6.1 Reset Mechanism
+## 5.1 Reset Mechanism
 
 **Mechanism**: Database TTL (CockroachDB native) with configurable duration
 
@@ -384,27 +334,25 @@ message ProductStat {
 
 **Note**: CockroachDB handles auto-deletion. No API endpoint needed.
 
-## 6.2 README
+## 5.2 README
 
 **Content**:
 - [ ] Overview of each API style
 - [ ] REST endpoints with curl examples
 - [ ] GraphQL queries examples
-- [ ] SOAP request/response samples
 - [ ] gRPC `grpcurl` examples
 - [ ] WebSocket client example
 
-## 6.3 Testing Checklist
+## 5.3 Testing Checklist
 
 - [ ] REST: curl all endpoints
 - [ ] GraphQL: queries via Postman/Insomnia
-- [ ] SOAP: XML envelope examples
 - [ ] gRPC: `grpcurl` commands
 - [ ] WebSocket: client connection test
 
 ---
 
-# Phase 7: User Authentication (TODO - implemented after Phase 6)
+# Phase 6: User Authentication (TODO - implemented after Phase 5)
 
 **Goal**: Users get a short-lived token. All requests must include token in header. Each user only sees their own products/orders.
 
@@ -417,7 +365,7 @@ message ProductStat {
 - `user.created_at` (timestamp)
 - Add `user_id` column to products, orders tables
 
-## 7.1 Token Generation
+## 6.1 Token Generation
 
 **Auth flow**:
 - [ ] User registers (generates `user_id`)
@@ -425,14 +373,14 @@ message ProductStat {
 - [ ] Token expires after configurable duration via `TOKEN_EXPIRY` env var (default: 1 hour, min: 5 minutes)
 - [ ] Returns both `user_id` and `token`
 
-## 7.2 Token Validation
+## 6.2 Token Validation
 
 **Per-request validation**:
 - [ ] Extract token from `Authorization: Bearer <token>` header
 - [ ] Validate token exists and not expired
 - [ ] Reject requests with missing/invalid/expired token (401 Unauthorized)
 
-## 7.3 Data Isolation
+## 6.3 Data Isolation
 
 **Queries filter by user**:
 - [ ] `GET /products` → returns only products where `product.user_id == token.user_id`
@@ -452,11 +400,11 @@ message ProductStat {
 
 ## Service/Repo Layer API-Agnostic
 
-All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service layer**:
+All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  API Handlers (REST / GraphQL / SOAP / gRPC / WebSocket)       │
+│  API Handlers (REST / GraphQL / gRPC / WebSocket)              │
 ├────────────────────────────────────────────────────────────────┤
 │  Services (ProductService, OrderService, PaymentService...)    │
 │  - Business logic only                                         │
@@ -550,12 +498,6 @@ POST /auth/token     Refresh token (extends expiry)
 ```
 
 > All endpoints require: `Authorization: Bearer <token>` header
-
-## SOAP (`:8080/soap`)
-
-```
-POST /soap        PlaceOrder, GetPaymentStatus
-```
 
 ## gRPC (`:50051`)
 
