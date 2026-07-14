@@ -39,8 +39,6 @@ Phase 6   User Authentication ─────────── token-based auth
 
 ## Data Models
 
-### After Phase 6 (with auth)
-
 ### Product (current)
 - `prod_id` (string) — format: `PR-XXXXXX` (primary key)
 - `prod_name` (string)
@@ -50,27 +48,19 @@ Phase 6   User Authentication ─────────── token-based auth
 - `updated_at` (timestamp)
 - `ttl_expires_at` (timestamp) — for auto-cleanup
 
-### Order (future, Phase 1.2)
+### Order (implemented, Phase 1.2 complete — supersedes the original spec below)
 - `order_id` (string) — format: `OR-XXXXXX` (primary key)
-- `user_id` (string, FK) — references `user_id` (Phase 7)
 - `product_id` (string, FK) — references `prod_id`
 - `quantity` (int)
-- `total_price` (float64)
-- `order_time` (timestamp)
-- `status` (string: "pending", "paid", "failed")
-- `shipping_address` (string) — updatable
-- `notes` (string) — updatable
+- `amount` (float64) — validated against `product.price * quantity` (epsilon 0.005)
+- `created_at` (timestamp)
+- `status` (string) — currently always set to `"success"` on create; no state machine yet
+- `shipping_address` (string)
+- `card_number` (string) — 4-digit simulated card token (not a real PAN); `"6969"` simulates a failed transaction
+- `notes` (string, optional)
 - `ttl_expires_at` (timestamp)
 
-### Payment (future, Phase 1.3)
-- `payment_id` (string) — format: `PA-XXXXXX` (primary key)
-- `order_id` (string, FK) — references `order_id`
-- `amount` (float64)
-- `status` (string: "pending", "success", "failed")
-- `card_number` (string) — stored for simulation validation
-- `card_last_four` (string) — last 4 digits
-- `created_at` (timestamp)
-- `ttl_expires_at` (timestamp)
+> No `user_id` column exists — auth (Phase 6) hasn't landed. No separate `Payment` model/table is used by the app; Phase 1.3/1.4 payments were dropped from scope (see Progress Summary). The `payments` table still exists in `migrations/003_create_payments.up.sql` but nothing in Go code reads or writes it.
 
 > **Note**: ID is generated in the service layer. Format: `PR-` for products, `OR-` for orders, `PA-` for payments. Use short random string (7 chars) after prefix.
 
@@ -80,7 +70,7 @@ Phase 6   User Authentication ─────────── token-based auth
 
 | API | Resources | Purpose | Strength Demonstrated |
 |-----|-----------|---------|----------------------|
-| REST | Products + Orders + Payments | Complete CRUD + full flow | Standard REST patterns |
+| REST | Products + Orders | Complete CRUD + full flow | Standard REST patterns |
 | GraphQL | Orders (with nested products) | Filtering + nested queries | Flexible data fetching |
 | gRPC | Analytics | Aggregations | High-performance streaming |
 | WebSocket | Notifications | Real-time events | Push updates |
@@ -214,7 +204,7 @@ type Product {
 
 # Phase 3: gRPC Analytics
 
-## 4.1 Protocol Buffer Definition
+## 3.1 Protocol Buffer Definition
 
 **File**: `proto/analytics.proto`
 
@@ -246,7 +236,7 @@ message ProductStat {
 }
 ```
 
-## 4.2 Implementation
+## 3.2 Implementation
 
 - [ ] Generate Go code from proto
 - [ ] Create `AnalyticsService` in `services/`
@@ -429,7 +419,7 @@ All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 # Technical Standards
 
 ## Error Handling
-- Use sentinel errors from `utils/errors.go`
+- Use sentinel errors from `utils/customErrors/errors.go`
 - Wrap with context: `fmt.Errorf("service.Method: %w", err)`
 - Return structured errors (not internal details)
 
@@ -470,9 +460,9 @@ All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 
 # Endpoints Summary
 
-## REST (`:8080`)
+## REST (`:8013` by default, configurable via `PORT`)
 
-**Current implementation**
+**Current implementation (Phase 1 complete)**
 ```
 /products         POST, GET (list)
 /products/{id}    GET, PATCH, DELETE
@@ -481,16 +471,7 @@ All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 /graphql          POST
 ```
 
-**Planned (Phase 1 complete)**
-```
-/products         GET, POST
-/products/{id}    GET, PATCH, DELETE
-/orders           GET, POST
-/orders/{id}      GET
-/graphql          POST
-```
-
-## Auth (`:8080/auth`)
+## Auth (`/auth`, same port as REST)
 
 ```
 POST /auth/register   Create user, returns user_id + token
@@ -505,7 +486,7 @@ POST /auth/token     Refresh token (extends expiry)
 AnalyticsService: GetTotalSales, GetAverageOrderValue, GetTopProducts, GetLowStockProducts
 ```
 
-## WebSocket (`:8080/ws`)
+## WebSocket (`/ws`, same port as REST)
 
 ```
 WS /ws            Subscribe to: orders, payments, alerts
