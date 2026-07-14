@@ -1,6 +1,6 @@
 # Go March Backend — Development Roadmap
 
-> **Concept**: A JSONPlaceholder-style learning API demonstrating 5 different API styles in Go. Users can test and learn REST, GraphQL, SOAP, gRPC, and WebSocket by interacting with a simple inventory/order system.
+> **Concept**: A JSONPlaceholder-style learning API demonstrating 4 different API styles in Go. Users can test and learn REST, GraphQL, gRPC, and WebSocket by interacting with a simple inventory/order system.
 >
 > **Architecture**: Layered design (handlers → services → repos) where service and repo layers are API-agnostic. All API styles share the same business logic.
 
@@ -13,23 +13,25 @@ Each API style demonstrates its strengths. No duplication of CRUD across APIs.
 ```
 Phase 1   REST Completion ────────────── complete end-to-end flow (products + orders + payments)
 Phase 2   GraphQL Enhancement ─────────── orders + nested products
-Phase 3   SOAP Implementation ────────── payment transactions
-Phase 4   gRPC Analytics ──────────────── high-perf aggregations
-Phase 5   WebSocket Real-time ──────────── notifications
-Phase 6   Cleanup + Documentation ─────── reset mechanism + README
+Phase 3   gRPC Analytics ──────────────── high-perf aggregations
+Phase 4   WebSocket Real-time ──────────── notifications
+Phase 5   Cleanup + Documentation ─────── reset mechanism + README
+Phase 6   User Authentication ─────────── token-based auth with middleware
 ```
 
-**Current status**: Product CRUD functional. Orders/payments not started.
+**Current status**: Product CRUD complete. Order CRUD complete.
 
 ## Progress Summary
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **Phase 1.1** | 🔶 Partial | Product CRUD; paths differ from target (`/product` vs `/products/{id}`) |
-| **Phase 1.2-1.4** | ⬜ Not Started | Orders, payments, payment simulation |
+| **Phase 1.1** | ✅ Complete | Product CRUD with routes (`/products`, `/products/{id}`) + pagination |
+| **Phase 1.2** | ✅ Complete | Order CRUD: POST, GET list, GET by ID. No PATCH/DELETE/Payments. |
+| **Phase 1.3-1.4** | N/A | Out of scope — no payments, no order update/delete |
 | **Phase 2** | 🔶 Minimal | GraphQL has products only |
-| **Phase 3-5** | ⬜ Not Started | SOAP, gRPC, WebSocket stubs |
-| **Phase 6** | ⬜ Not Started | TTL, README |
+| **Phase 3-4** | ⬜ Not Started | gRPC, WebSocket stubs |
+| **Phase 5** | ⬜ Not Started | TTL, README |
+| **Phase 6** | ⬜ TODO | User authentication with middleware (after Phase 5) |
 
 **Legend**: ✅ Complete | 🔶 In Progress | ⬜ Not Started
 
@@ -37,7 +39,7 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 ## Data Models
 
-### Product
+### Product (current)
 - `prod_id` (string) — format: `PR-XXXXXX` (primary key)
 - `prod_name` (string)
 - `price` (float64)
@@ -46,26 +48,19 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 - `updated_at` (timestamp)
 - `ttl_expires_at` (timestamp) — for auto-cleanup
 
-### Order
+### Order (implemented, Phase 1.2 complete — supersedes the original spec below)
 - `order_id` (string) — format: `OR-XXXXXX` (primary key)
 - `product_id` (string, FK) — references `prod_id`
 - `quantity` (int)
-- `total_price` (float64)
-- `order_time` (timestamp)
-- `status` (string: "pending", "paid", "failed")
-- `shipping_address` (string) — updatable
-- `notes` (string) — updatable
+- `amount` (float64) — validated against `product.price * quantity` (epsilon 0.005)
+- `created_at` (timestamp)
+- `status` (string) — currently always set to `"success"` on create; no state machine yet
+- `shipping_address` (string)
+- `card_number` (string) — 4-digit simulated card token (not a real PAN); `"6969"` simulates a failed transaction
+- `notes` (string, optional)
 - `ttl_expires_at` (timestamp)
 
-### Payment
-- `payment_id` (string) — format: `PA-XXXXXX` (primary key)
-- `order_id` (string, FK) — references `order_id`
-- `amount` (float64)
-- `status` (string: "pending", "success", "failed")
-- `card_number` (string) — stored for simulation validation
-- `card_last_four` (string) — last 4 digits
-- `created_at` (timestamp)
-- `ttl_expires_at` (timestamp)
+> No `user_id` column exists — auth (Phase 6) hasn't landed. No separate `Payment` model/table is used by the app; Phase 1.3/1.4 payments were dropped from scope (see Progress Summary). The `payments` table still exists in `migrations/003_create_payments.up.sql` but nothing in Go code reads or writes it.
 
 > **Note**: ID is generated in the service layer. Format: `PR-` for products, `OR-` for orders, `PA-` for payments. Use short random string (7 chars) after prefix.
 
@@ -75,9 +70,8 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 | API | Resources | Purpose | Strength Demonstrated |
 |-----|-----------|---------|----------------------|
-| REST | Products + Orders + Payments | Complete CRUD + full flow | Standard REST patterns |
+| REST | Products + Orders | Complete CRUD + full flow | Standard REST patterns |
 | GraphQL | Orders (with nested products) | Filtering + nested queries | Flexible data fetching |
-| SOAP | Payments | Transaction operations | XML contracts |
 | gRPC | Analytics | Aggregations | High-performance streaming |
 | WebSocket | Notifications | Real-time events | Push updates |
 
@@ -87,37 +81,36 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
 
 ## 1.1 Complete Product CRUD
 
-**Implemented routes** (differs from target naming below — consolidate on `/products` + `/products/{id}` when convenient):
-- [x] `POST /product` — create product
+**Implemented routes**:
+- [x] `POST /products` — create product
 - [x] `GET /products` — list all products
-- [x] `GET /product/{id}` — get single product
-- [x] `PATCH /product` — update product (`prod_id` in JSON body)
-- [x] `DELETE /product/{id}` — delete product *(still returns 200 with JSON; Phase 1 target is 204 No Content)*
+- [x] `GET /products/{id}` — get single product
+- [x] `PATCH /products/{id}` — update product
+- [x] `DELETE /products/{id}` — delete product *(still returns 200 with JSON; Phase 1 target is 204 No Content)*
 
 **Target REST shape** (documentation / client examples):
-- [ ] `POST /products` — create product
-- [x] `GET /products` — list all products *(path matches; POST not on `/products` yet)*
-- [ ] `GET /products/{id}` — get single product
-- [ ] `PATCH /products/{id}` — update product
-- [ ] `DELETE /products/{id}` — delete product
-- [ ] `GET /products` — pagination (e.g. `limit` / `offset` or cursor) so list is never unbounded
+- [x] `POST /products` — create product
+- [x] `GET /products` — list all products
+- [x] `GET /products/{id}` — get single product
+- [x] `PATCH /products/{id}` — update product
+- [x] `DELETE /products/{id}` — delete product
+- [x] `GET /products` — pagination (e.g. `limit` / `offset` or cursor) so list is never unbounded
 
 **Logging improvements** (deferred to Phase 6 or post-Phase 1 cleanup):
-- [ ] **L1** Make log level configurable via `LOG_LEVEL` env var (currently hardcoded to Debug in `utils.BuildLogger`)
-- [ ] **L2** Environment-based logger config (development vs production mode)
+- [x] **L1** Make log level configurable via `LOG_LEVEL` env var (currently hardcoded to Debug in `utils.BuildLogger`)
+- [x] **L2** Environment-based logger config (development vs production mode)
   - Development: console encoding, file output to `logs/app.log`, stack traces on error
   - Production: JSON encoding, stdout only, stack traces on panic
   - Use `ENV` environment variable to switch modes
-- [ ] **L3** Add request ID middleware for context propagation
+- [x] **L3** Add request ID middleware for context propagation
   - Generate unique request ID per HTTP request (e.g., UUID)
   - Inject into `context.Context` via middleware
   - Include in all logs: `zap.String("request_id", requestID)`
-  - Add `X-Request-ID` response header for client correlation
-- [ ] **L4** Add logger to GraphQL resolvers
+- [x] **L4** Add logger to GraphQL resolvers
   - Pass `*zap.Logger` to `Resolver` struct (currently only has `productService`)
   - Log errors in resolver methods (currently silent failures)
   - Include query/mutation name in log context
-- [ ] **L5** Standardize service layer logging policy
+- [x] **L5** Standardize service layer logging policy
   - Log mutations (create/update/delete) at Info level with entity ID
   - Don't log read operations (get/list) unless they fail
   - Document this policy in CLAUDE.md
@@ -125,58 +118,37 @@ Phase 6   Cleanup + Documentation ─────── reset mechanism + README
   - Location: `product_handler.go:143` — was `http.Error(w, err.Error(), http.StatusConflict)`
   - Issue: exposed internal error messages to client
   - Fix: changed to `utils.SendJSONError(w, http.StatusConflict, "")`
-- [ ] **L7** Standardize debug field naming
+- [x] **L7** Standardize debug field naming
   - Remove spaces from field names (`"request param"` → `"id"`)
   - Remove trailing punctuation from messages (`"received ID => "` → `"received request"`)
   - Example: `product_handler.go:74` — `zap.String("request param", idStr)` → `zap.String("id", idStr)`
-- [ ] **L8** Add context fields to error logs
+- [x] **L8** Add context fields to error logs
   - Include relevant IDs/identifiers when logging errors for traceability
   - Example: `h.log.Error("failed to fetch product", zap.Error(err), zap.String("id", idStr))`
   - Currently some error logs lack context (e.g., `product_handler.go:100` — no context on FetchAll failure)
 
 **ID generation**:
-- [ ] Change `prod_id` from INT8 to STRING in database schema
+- [x] Change `prod_id` from INT8 to STRING in database schema
 - [x] All code layers use string IDs (models, repo, service, handlers, GraphQL)
 
 ## 1.2 Complete Orders CRUD
 
 **Endpoints**:
-- [ ] `POST /orders` — create order (decrements stock)
-- [ ] `GET /orders` — list orders *(with pagination; same style as `GET /products`)*
-- [ ] `GET /orders/{id}` — get single order
-- [ ] `PATCH /orders/{id}` — update (address, notes ONLY)
+- [x] `POST /orders` — create order (decrements stock)
+- [x] `GET /orders` — list orders *(with pagination; same style as `GET /products`)*
+- [x] `GET /orders/{id}` — get single order
 
 **Business logic**:
-- [ ] Validate product exists and has sufficient stock
-- [ ] Decrement stock on order creation
-- [ ] Auto-set order status based on payment (handled later)
-- [ ] Generate `OR-XXXXXX` ID in service layer on create
+- [x] Validate product exists and has sufficient stock
+- [x] Decrement stock on order creation
+- [x] Auto-set order status based on payment (handled later)
+- [x] Generate `OR-XXXXXX` ID in service layer on create
 
-## 1.3 Complete Payments API
-
-**Endpoints** (no refunds):
-- [ ] `POST /payments` — create payment (simulate authorize)
-- [ ] `GET /payments/{id}` — get payment status
-- [ ] Link payment to order via `order_id`
-- [ ] Generate `PA-XXXXXX` ID in service layer on create
-
-## Payment simulation
-
-- [ ] Payment fails if card number ends in "6969"
-- [ ] All other card numbers succeed (deterministic for testing)
-- [ ] Atomic operation: create payment + set order status in single transaction
-- [ ] Payment status = "success" → Order status = "paid"
-- [ ] Payment status = "failed" → Order status = "failed"
-
-## 1.4 Order Update Scope
-
-**Only these fields updatable**:
-- `shipping_address`
-- `notes`
-
-**Not updatable** (automatic or admin only):
-- `status` — set by payment flow
-- `delivery_date` — out of scope
+**Create order — pending / incomplete** (handler or service may exist before this is finished; implement end-to-end in service + repo layers):
+- [x] **Stock check**: before insert, ensure `products.stock >= quantity`; reject when insufficient (prevents overselling under concurrency when combined with transactional update below).
+- [x] **Stock decrement**: update `products.stock` (subtract `quantity`) in the **same transaction** as inserting the order row so both succeed or both roll back.
+- [x] **Error mapping** (do not expose internal DB messages): product missing → **404**; insufficient stock → **409 Conflict** (or **422 Unprocessable Entity**, project-wide pick one); invalid body / `quantity <= 0` → **400**; transaction / unexpected failures → **500** with generic client message.
+- [ ] Optional later: retries, idempotency keys, or row-level locking strategy if contention shows up in tests.
 
 ---
 
@@ -230,57 +202,9 @@ type Product {
 
 ---
 
-# Phase 3: SOAP Implementation
+# Phase 3: gRPC Analytics
 
-## 3.1 SOAP Endpoints
-
-**Purpose**: Payment transactions with strict XML contracts. Demonstrates enterprise/XML patterns.
-
-**Operations**:
-- [ ] `PlaceOrder` — create order + process payment atomically
-- [ ] `GetPaymentStatus` — retrieve payment details
-
-## 3.2 XML Schema
-
-**SOAP Envelope Structure**:
-```xml
-<soap:Envelope>
-  <soap:Header>
-    <!-- optional auth -->
-  </soap:Header>
-  <soap:Body>
-    <PlaceOrderRequest>
-      <product_id>123</product_id>
-      <quantity>2</quantity>
-      <shipping_address>123 Main St</shipping_address>
-      <payment>
-        <card_number>4111111111111111</card_number>
-        <expiry>12/25</expiry>
-      </payment>
-    </PlaceOrderRequest>
-  </soap:Body>
-</soap:Envelope>
-```
-
-## 3.3 Implementation
-
-- [ ] XML structs with `encoding/xml` tags
-- [ ] `SOAPAction` header handling
-- [ ] SOAP Fault for errors
-- [ ] Reuse `OrderService` + `PaymentService` (shared layer)
-- [ ] Endpoint: `POST /soap`
-
-## 3.4 Payment Simulation
-
-- [ ] Simulate authorization (success/failure)
-- [ ] Return appropriate SOAP response
-- [ ] Link order + payment in database
-
----
-
-# Phase 4: gRPC Analytics
-
-## 4.1 Protocol Buffer Definition
+## 3.1 Protocol Buffer Definition
 
 **File**: `proto/analytics.proto`
 
@@ -312,7 +236,7 @@ message ProductStat {
 }
 ```
 
-## 4.2 Implementation
+## 3.2 Implementation
 
 - [ ] Generate Go code from proto
 - [ ] Create `AnalyticsService` in `services/`
@@ -320,16 +244,16 @@ message ProductStat {
 - [ ] Implement gRPC server in `api/grpc/`
 - [ ] Run on separate port (`:50051`)
 
-## 4.3 Streaming (Optional)
+## 3.3 Streaming (Optional)
 
 - [ ] Server-side streaming for top products / low stock
 - [ ] Demonstrates gRPC streaming capability
 
 ---
 
-# Phase 5: WebSocket Real-time
+# Phase 4: WebSocket Real-time
 
-## 5.1 WebSocket Architecture
+## 4.1 WebSocket Architecture
 
 **Library**: `nhooyr.io/websocket` (context-aware, modern)
 
@@ -338,7 +262,7 @@ message ProductStat {
 - `broadcast` — channel for messages
 - `register/unregister` — channels for connection lifecycle
 
-## 5.2 Events
+## 4.2 Events
 
 **Subscription topics**:
 - [ ] `orders` — new order created
@@ -357,7 +281,7 @@ message ProductStat {
 }
 ```
 
-## 5.3 Integration
+## 4.3 Integration
 
 - [ ] Create `hub` struct with run loop
 - [ ] HTTP upgrade handler at `/ws`
@@ -367,9 +291,9 @@ message ProductStat {
 
 ---
 
-# Phase 6: Cleanup + Documentation
+# Phase 5: Cleanup + Documentation
 
-## 6.1 Reset Mechanism
+## 5.1 Reset Mechanism
 
 **Mechanism**: Database TTL (CockroachDB native) with configurable duration
 
@@ -400,23 +324,65 @@ message ProductStat {
 
 **Note**: CockroachDB handles auto-deletion. No API endpoint needed.
 
-## 6.2 README
+## 5.2 README
 
 **Content**:
 - [ ] Overview of each API style
 - [ ] REST endpoints with curl examples
 - [ ] GraphQL queries examples
-- [ ] SOAP request/response samples
 - [ ] gRPC `grpcurl` examples
 - [ ] WebSocket client example
 
-## 6.3 Testing Checklist
+## 5.3 Testing Checklist
 
 - [ ] REST: curl all endpoints
 - [ ] GraphQL: queries via Postman/Insomnia
-- [ ] SOAP: XML envelope examples
 - [ ] gRPC: `grpcurl` commands
 - [ ] WebSocket: client connection test
+
+---
+
+# Phase 6: User Authentication (TODO - implemented after Phase 5)
+
+**Goal**: Users get a short-lived token. All requests must include token in header. Each user only sees their own products/orders.
+
+**Implementation**: Authentication via middleware. Token validation middleware wraps protected routes.
+
+**Data models to add**:
+- `user_id` (string) — format: `US-XXXXXX` (primary key)
+- `user.token` (string) — short-lived auth token
+- `user.token_expires_at` (timestamp)
+- `user.created_at` (timestamp)
+- Add `user_id` column to products, orders tables
+
+## 6.1 Token Generation
+
+**Auth flow**:
+- [ ] User registers (generates `user_id`)
+- [ ] Server generates token (e.g., `US-XXXXXX:abcdef123456`, 7-char token)
+- [ ] Token expires after configurable duration via `TOKEN_EXPIRY` env var (default: 1 hour, min: 5 minutes)
+- [ ] Returns both `user_id` and `token`
+
+## 6.2 Token Validation
+
+**Per-request validation**:
+- [ ] Extract token from `Authorization: Bearer <token>` header
+- [ ] Validate token exists and not expired
+- [ ] Reject requests with missing/invalid/expired token (401 Unauthorized)
+
+## 6.3 Data Isolation
+
+**Queries filter by user**:
+- [ ] `GET /products` → returns only products where `product.user_id == token.user_id`
+- [ ] `GET /orders` → returns only orders where `order.user_id == token.user_id`
+- [ ] `POST /products` → creates product with `user_id` from token
+- [ ] `POST /orders` → creates order with `user_id` from token
+
+**Implementation notes**:
+- [ ] Add `user_id` column to products, orders tables
+- [ ] Modify service layer to accept `user_id` context
+- [ ] Middleware to validate token and extract `user_id`
+- [ ] Pass `user_id` through context to service/repo layer
 
 ---
 
@@ -424,11 +390,11 @@ message ProductStat {
 
 ## Service/Repo Layer API-Agnostic
 
-All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service layer**:
+All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  API Handlers (REST / GraphQL / SOAP / gRPC / WebSocket)       │
+│  API Handlers (REST / GraphQL / gRPC / WebSocket)              │
 ├────────────────────────────────────────────────────────────────┤
 │  Services (ProductService, OrderService, PaymentService...)    │
 │  - Business logic only                                         │
@@ -453,7 +419,7 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 # Technical Standards
 
 ## Error Handling
-- Use sentinel errors from `utils/errors.go`
+- Use sentinel errors from `utils/customErrors/errors.go`
 - Wrap with context: `fmt.Errorf("service.Method: %w", err)`
 - Return structured errors (not internal details)
 
@@ -474,7 +440,7 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 ## Logging
 - Use `zap` logger
 - Structure: `logger.Info("message", zap.String("key", value))`
-- Never log request bodies (may contain PII/secrets)
+- Request bodies may be logged freely — toy project, no real user data (no PII/secrets policy needed)
 - Static messages with structured fields (not `fmt.Errorf().Error()`)
 - Log errors at handler layer, business events at service layer
 
@@ -494,32 +460,25 @@ All API styles (REST, GraphQL, SOAP, gRPC, WebSocket) use the **same service lay
 
 # Endpoints Summary
 
-## REST (`:8080`)
+## REST (`:8013` by default, configurable via `PORT`)
 
-**Current implementation**
+**Current implementation (Phase 1 complete)**
 ```
-/product          POST (create), PATCH (update)
-/products         GET (list)
-/product/{id}     GET, DELETE
-/graphql          POST
-```
-
-**Planned (Phase 1 complete)**
-```
-/products         GET, POST
+/products         POST, GET (list)
 /products/{id}    GET, PATCH, DELETE
-/orders           GET, POST
-/orders/{id}      GET, PATCH
-/payments         POST
-/payments/{id}    GET
+/orders           POST, GET (list)
+/orders/{id}      GET
 /graphql          POST
 ```
 
-## SOAP (`:8080/soap`)
+## Auth (`/auth`, same port as REST)
 
 ```
-POST /soap        PlaceOrder, GetPaymentStatus
+POST /auth/register   Create user, returns user_id + token
+POST /auth/token     Refresh token (extends expiry)
 ```
+
+> All endpoints require: `Authorization: Bearer <token>` header
 
 ## gRPC (`:50051`)
 
@@ -527,7 +486,7 @@ POST /soap        PlaceOrder, GetPaymentStatus
 AnalyticsService: GetTotalSales, GetAverageOrderValue, GetTopProducts, GetLowStockProducts
 ```
 
-## WebSocket (`:8080/ws`)
+## WebSocket (`/ws`, same port as REST)
 
 ```
 WS /ws            Subscribe to: orders, payments, alerts

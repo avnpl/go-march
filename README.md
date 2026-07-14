@@ -35,59 +35,59 @@ echo "LOG_LEVEL=debug" >> .env
 
 # Run
 go run main.go
-# Server starts on :8080
+# Server starts on :8013
 ```
 
 ---
 
 ## REST API
 
-Base URL: `http://localhost:8080`
+Base URL: `http://localhost:8013`
 
 ### Products
 
 ```bash
 # Create a product
-curl -X POST http://localhost:8080/product \
+curl -X POST http://localhost:8013/products \
   -H "Content-Type: application/json" \
   -d '{"prod_name": "Widget", "price": 9.99, "stock": 100}'
 
 # Get all products
-curl http://localhost:8080/products
+curl http://localhost:8013/products
 
 # Get a product by ID
-curl http://localhost:8080/product/{id}
+curl http://localhost:8013/products/{id}
 
 # Update a product
-curl -X PATCH http://localhost:8080/product \
+curl -X PATCH http://localhost:8013/products/{id} \
   -H "Content-Type: application/json" \
-  -d '{"prod_id": "abc123", "price": 12.99}'
+  -d '{"name": "Widget Pro", "price": 12.99}'
 
 # Delete a product
-curl -X DELETE http://localhost:8080/product/{id}
+curl -X DELETE http://localhost:8013/products/{id}
 ```
 
 ---
 
 ## GraphQL API
 
-Endpoint: `POST http://localhost:8080/graphql`
+Endpoint: `POST http://localhost:8013/graphql`
 
 ```bash
 # Fetch all products
-curl -X POST http://localhost:8080/graphql \
+curl -X POST http://localhost:8013/graphql \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ products { prod_id prod_name price stock } }"}'
+  -d '{"query": "{ getAllProducts { prod_id prod_name price stock } }"}'
 
 # Fetch a single product
-curl -X POST http://localhost:8080/graphql \
+curl -X POST http://localhost:8013/graphql \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ product(id: \"abc123\") { prod_name price stock } }"}'
+  -d '{"query": "{ getProductByID(id: \"PR-abc123\") { prod_name price stock } }"}'
 
 # Update a product
-curl -X POST http://localhost:8080/graphql \
+curl -X POST http://localhost:8013/graphql \
   -H "Content-Type: application/json" \
-  -d '{"query": "mutation { updateProduct(prod_id: \"abc123\", price: 14.99) { prod_name price } }"}'
+  -d '{"query": "mutation { updateProduct(input: {prod_id: \"PR-abc123\", price: 14.99}) { prod_name price } }"}'
 ```
 
 ---

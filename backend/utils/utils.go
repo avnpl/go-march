@@ -1,15 +1,17 @@
 package utils
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"log"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/avnpl/go-march/utils/customErrors"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -31,6 +33,10 @@ func GetEnvVarString(key string, defaultValue string, logger *zap.Logger) string
 
 func GetEnvVarInteger(key string, defaultValue int, logger *zap.Logger) int {
 	value := getEnvVar(key)
+	if value == "" {
+		logger.Warn("Key not present in env variables")
+		return defaultValue
+	}
 
 	res, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
@@ -48,7 +54,17 @@ func BuildLogger() *zap.Logger {
 		log.Fatalf("Failed to create log directory: %v", err)
 	}
 
-	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	logLevelFromConfig := getEnvVar("LOG_LEVEL")
+	if logLevelFromConfig == "" {
+		logLevelFromConfig = "info"
+	}
+
+	level := zap.NewAtomicLevel()
+	if err := level.UnmarshalText([]byte(logLevelFromConfig)); err != nil {
+		log.Fatalf("Invalid log level in env : %v", err)
+	}
+
+	loggerConfig.Level = zap.NewAtomicLevelAt(level.Level())
 	loggerConfig.Development = true
 	loggerConfig.EncoderConfig.TimeKey = "ts"
 	loggerConfig.EncoderConfig.MessageKey = "event"
@@ -81,10 +97,12 @@ func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
 		logger.Fatal("db connect failed", zap.Error(err))
 	}
 
-	lifetime := GetEnvVarInteger("DB_MAX_CONN_LIFETIME_SEC", 10, logger)
+	lifetime := GetEnvVarInteger("DB_MAX_CONN_LIFETIME_MINS", 30, logger)
+	idletime := GetEnvVarInteger("DB_MAX_CONN_IDLETIME_MINS", 5, logger)
 	db.SetMaxOpenConns(GetEnvVarInteger("DB_MAX_OPEN_CONNS", 25, logger))
 	db.SetMaxIdleConns(GetEnvVarInteger("DB_MAX_IDLE_CONNS", 10, logger))
-	db.SetConnMaxLifetime(time.Duration(lifetime) * time.Second)
+	db.SetConnMaxLifetime(time.Duration(lifetime) * time.Minute)
+	db.SetConnMaxIdleTime(time.Duration(idletime) * time.Minute)
 	if err := db.Ping(); err != nil {
 		logger.Fatal("db ping failed", zap.Error(err))
 	}
@@ -93,7 +111,7 @@ func GetDBPoolObject(logger *zap.Logger) *sqlx.DB {
 }
 
 func SendJSONError(w http.ResponseWriter, statusCode int, message string) {
-	apiErr := APIError{
+	apiErr := customErrors.APIError{
 		Error:   http.StatusText(statusCode),
 		Message: message,
 	}
@@ -118,7 +136,8 @@ func GenerateID(prefix string) string {
 	result.WriteString("-")
 
 	for range 7 {
-		result.WriteByte(charSet[rand.Intn(36)])
+		n, _ := rand.Int(rand.Reader, big.NewInt(36))
+		result.WriteByte(charSet[n.Int64()])
 	}
 
 	return result.String()

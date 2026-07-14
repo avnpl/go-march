@@ -3,62 +3,92 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/avnpl/go-march/models"
+	"github.com/avnpl/go-march/utils"
+	"github.com/avnpl/go-march/utils/customErrors"
+	"github.com/avnpl/go-march/utils/log"
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 type ProductRepo interface {
 	Create(ctx context.Context, p *models.Product) (models.Product, error)
-	FetchByID(ctx context.Context, id string) (models.Product, error)
-	FetchAll(ctx context.Context) ([]models.Product, error)
+	FetchByID(txn *sqlx.Tx, ctx context.Context, id string) (models.Product, error)
+	FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error)
 	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id string) (models.Product, error)
+	DecrementStock(txn *sqlx.Tx, ctx context.Context, id string, qty int) (int, error)
+	BeginTransaction() (*sqlx.Tx, error)
 }
 
-type pgProductRepo struct {
-	db *sqlx.DB
+type productRepo struct {
+	db     *sqlx.DB
+	logger *zap.Logger
 }
 
-func NewPGProductRepo(db *sqlx.DB) ProductRepo {
-	return pgProductRepo{db: db}
+func NewProductRepo(db *sqlx.DB, logger *zap.Logger) ProductRepo {
+	return productRepo{db: db, logger: logger}
 }
 
-func (r pgProductRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
+func (r productRepo) Create(ctx context.Context, p *models.Product) (models.Product, error) {
 	const query = "insert into products (prod_id, prod_name, price, stock) values ($1, $2, $3, $4) returning *"
 
 	var res models.Product
 	if err := r.db.GetContext(ctx, &res, query, p.ProductID, p.Name, p.Price, p.Stock); err != nil {
+		log.Error(ctx, r.logger, "failed to create product", zap.Error(err))
 		return models.Product{}, fmt.Errorf("product_repo.Create: %w", err)
 	}
 	return res, nil
 }
 
-func (r pgProductRepo) FetchByID(ctx context.Context, id string) (models.Product, error) {
+func (r productRepo) FetchByID(txn *sqlx.Tx, ctx context.Context, id string) (models.Product, error) {
 	const query = "select * from products where prod_id = $1"
 
 	var result models.Product
-	err := r.db.GetContext(ctx, &result, query, id)
+
+	var err error
+	if txn != nil {
+		err = txn.GetContext(ctx, &result, query, id)
+	} else {
+		err = r.db.GetContext(ctx, &result, query, id)
+	}
+
 	if err != nil {
+		log.Error(ctx, r.logger, "failed to fetch product by ID", zap.String("id", id), zap.Error(err))
 		return result, fmt.Errorf("product_repo.FetchByID: %w", err)
 	}
 	return result, nil
 }
 
-func (r pgProductRepo) FetchAll(ctx context.Context) ([]models.Product, error) {
-	const query = "select * from products"
+func (r productRepo) FetchAll(ctx context.Context, limit int, offset int) ([]models.Product, error) {
+	query := "select * from products order by created_at desc limit $1"
+
+	if limit == 0 {
+		limit = utils.GetEnvVarInteger("FETCH_ALL_PRODS_DEFAULT_LIMIT", 10, r.logger)
+	}
+	args := []interface{}{limit}
+
+	if offset != 0 {
+		query += " offset $2"
+		args = append(args, offset)
+	}
+
+	log.Debug(ctx, r.logger, "fetching all products", zap.Int("limit", limit), zap.Int("offset", offset))
 
 	var result []models.Product
-	err := r.db.SelectContext(ctx, &result, query)
+	err := r.db.SelectContext(ctx, &result, query, args...)
 	if err != nil {
+		log.Error(ctx, r.logger, "failed to fetch all products", zap.Error(err))
 		return result, fmt.Errorf("product_repo.FetchAllProducts: %w", err)
 	}
 	return result, nil
 }
 
-func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error) {
+func (r productRepo) UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error) {
 	query := "update products set "
 	args := make(map[string]interface{})
 	var fieldsToUpdate []string
@@ -69,23 +99,26 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 		args["prod_name"] = p.Name
 	}
 
-	if p.Stock != 0 {
+	if p.Stock != nil {
 		fieldsToUpdate = append(fieldsToUpdate, "stock = :stock")
-		args["stock"] = p.Stock
+		args["stock"] = *p.Stock
 	}
 
-	if p.Price != 0.0 {
+	if p.Price != nil {
 		fieldsToUpdate = append(fieldsToUpdate, "price = :price")
-		args["price"] = p.Price
+		args["price"] = *p.Price
 	}
 
 	fieldsToUpdate = append(fieldsToUpdate, "updated_at = NOW()")
 	query += strings.Join(fieldsToUpdate, ", ")
-	query += " WHERE prod_id = :prod_id RETURNING *"
+	query += " where prod_id = :prod_id returning *"
 	args["prod_id"] = p.ProductID
+
+	log.Debug(ctx, r.logger, "updating product", zap.String("prod_id", p.ProductID))
 
 	result, err := r.db.NamedQueryContext(ctx, query, args)
 	if err != nil {
+		log.Error(ctx, r.logger, "failed to update product", zap.String("prod_id", p.ProductID), zap.Error(err))
 		return models.Product{}, fmt.Errorf("product_repo.Update: %w", err)
 	}
 	defer result.Close()
@@ -93,6 +126,7 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	if result.Next() {
 		err := result.StructScan(&res)
 		if err != nil {
+			log.Error(ctx, r.logger, "failed to scan updated product", zap.Error(err))
 			return models.Product{}, fmt.Errorf("product_repo.Update: %w", err)
 		}
 	} else {
@@ -102,13 +136,35 @@ func (r pgProductRepo) UpdateByID(ctx context.Context, p *models.UpdateProductRe
 	return res, nil
 }
 
-func (r pgProductRepo) DeleteByID(ctx context.Context, id string) (models.Product, error) {
+func (r productRepo) DeleteByID(ctx context.Context, id string) (models.Product, error) {
 	const query = "delete from products where prod_id = $1 returning *"
+
+	log.Debug(ctx, r.logger, "deleting product", zap.String("prod_id", id))
 
 	var result models.Product
 	err := r.db.GetContext(ctx, &result, query, id)
 	if err != nil {
+		log.Error(ctx, r.logger, "failed to delete product", zap.String("prod_id", id), zap.Error(err))
 		return result, fmt.Errorf("product_repo.DeleteByID: %w", err)
 	}
 	return result, nil
+}
+
+func (r productRepo) DecrementStock(txn *sqlx.Tx, ctx context.Context, id string, qty int) (int, error) {
+	const query = "update products set stock = stock - $1 where prod_id = $2 and stock >= $1 returning stock"
+
+	var newStock int
+	err := txn.GetContext(ctx, &newStock, query, qty, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, customErrors.OutOfStock
+	}
+	if err != nil {
+		log.Error(ctx, r.logger, "failed to decrement stock", zap.String("prod_id", id), zap.Error(err))
+		return 0, fmt.Errorf("product_repo.DecrementStock: %w", err)
+	}
+	return newStock, nil
+}
+
+func (r productRepo) BeginTransaction() (*sqlx.Tx, error) {
+	return r.db.Beginx()
 }
