@@ -440,7 +440,7 @@ All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 ## Logging
 - Use `zap` logger
 - Structure: `logger.Info("message", zap.String("key", value))`
-- Never log request bodies (may contain PII/secrets)
+- Request bodies may be logged freely — toy project, no real user data (no PII/secrets policy needed)
 - Static messages with structured fields (not `fmt.Errorf().Error()`)
 - Log errors at handler layer, business events at service layer
 

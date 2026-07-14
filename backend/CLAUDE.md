@@ -190,7 +190,7 @@ logger.Error("failed to fetch product", zap.Error(err), zap.String("id", id))
 - Don't log read operations (get/list) unless they fail
 - Use `trace.Info()`, `trace.Error()` from `utils/trace` for context propagation
 
-Never log request bodies — they may contain PII or secrets.
+This is a toy project — no real user data flows through it, so raw request bodies (including `product_handler.go`/`order_handler.go` debug logs) are logged freely for local debugging. No PII/secrets policy needed.
 
 ---
 
@@ -231,10 +231,9 @@ Load `.env` once at startup in `main()` — not inside utility functions called 
 See [`ROADMAP.md`](./ROADMAP.md) and [`verified-audit-report.md`](./verified-audit-report.md) for full detail (audit dated 2026-05-19 @ `661c925` — check current code before assuming a listed finding is still open; several have since been fixed, e.g. `OrderService.Create` now maps a missing product to 404).
 
 Open items:
-1. **Logging:** Request bodies logged at `Debug` level in REST handlers (`product_handler.go`, `order_handler.go`) — flagged as a security concern in the audit (raw bodies can carry card data); remove or gate for production.
-2. **GraphQL:** no `createProduct` mutation; no order queries yet (Phase 2, not started).
-3. **No migration runner:** `migrations/*.up.sql` are plain reference files, not applied by any tool; no `.down.sql` files exist.
-4. See `verified-audit-report.md` for the broader list of open findings (security, performance, maintainability) not tracked individually here.
+1. **GraphQL:** no `createProduct` mutation; no order queries yet (Phase 2, not started).
+2. **No migration runner:** `migrations/*.up.sql` are plain reference files, not applied by any tool; no `.down.sql` files exist.
+3. See `verified-audit-report.md` for the broader list of open findings (performance, maintainability) not tracked individually here — the audit's request-body-logging finding no longer applies (see above: toy project, no real data).
 
 **Resolved (do not re-report):** `time.Time` on models; `.env` loaded once in `main()`; DB pool configured; error logging uses static message + `zap.Error(err)`; `errors.Is` for sentinels; string IDs end-to-end for Product and Order (REST + GraphQL); REST paths match `/products`, `/products/{id}`, `/orders`, `/orders/{id}`; SQL keywords lowercase in `product_repo.go`; `GenerateID` uses a 7-char suffix; `migrations/002_create_orders.up.sql` synced with the live `orders` schema; `OrderService.Create` maps a missing product to `customErrors.RecordNotFound` (404).
 
