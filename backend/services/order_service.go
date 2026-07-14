@@ -57,6 +57,9 @@ func (s *orderService) Create(ctx context.Context, req models.CreateOrderReq) (m
 
 	product, err := s.productRepo.FetchByID(txn, ctx, order.ProductID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Order{}, customErrors.RecordNotFound
+		}
 		return models.Order{}, fmt.Errorf("order_service.Create: %w", err)
 	}
 
