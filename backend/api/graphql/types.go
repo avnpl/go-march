@@ -47,3 +47,23 @@ var DeleteProductInput = graphql.NewInputObject(graphql.InputObjectConfig{
 		},
 	},
 })
+
+func NewOrderType(r *Resolver) *graphql.Object {
+	return graphql.NewObject(graphql.ObjectConfig{
+		Name: "Order",
+		Fields: graphql.Fields{
+			"order_id":         &graphql.Field{Type: graphql.String},
+			"product_id":       &graphql.Field{Type: graphql.String},
+			"quantity":         &graphql.Field{Type: graphql.Int},
+			"total_price":      &graphql.Field{Type: graphql.Float, Resolve: r.ResolveOrderTotalPrice},
+			"status":           &graphql.Field{Type: graphql.String},
+			"shipping_address": &graphql.Field{Type: graphql.String},
+			"notes":            &graphql.Field{Type: graphql.String},
+			"created_at":       &graphql.Field{Type: graphql.String, Resolve: r.ResolveOrderCreatedAt},
+			"product": &graphql.Field{
+				Type:    ProductType,
+				Resolve: r.ResolveOrderProduct,
+			},
+		},
+	})
+}

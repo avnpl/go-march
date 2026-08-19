@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"context"
+	"time"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
@@ -12,12 +13,14 @@ import (
 
 type Resolver struct {
 	productService services.ProductService
+	orderService   services.OrderService
 	logger         *zap.Logger
 }
 
-func NewResolver(productService services.ProductService, logger *zap.Logger) *Resolver {
+func NewResolver(productService services.ProductService, orderService services.OrderService, logger *zap.Logger) *Resolver {
 	return &Resolver{
 		productService: productService,
+		orderService:   orderService,
 		logger:         logger,
 	}
 }
@@ -133,4 +136,63 @@ func (r *Resolver) DeleteProduct(p graphql.ResolveParams) (interface{}, error) {
 	}
 
 	return product, nil
+}
+
+func (r *Resolver) GetOrderByID(p graphql.ResolveParams) (interface{}, error) {
+
+	idStr, ok := p.Args["id"].(string)
+	if !ok {
+		return nil, nil
+	}
+
+	ctx := p.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	order, err := r.orderService.FetchByID(ctx, idStr)
+	if err != nil {
+		log.Error(ctx, r.logger, "resolver: getOrderByID failed", zap.String("id", idStr), zap.Error(err))
+		return nil, err
+	}
+
+	return order, nil
+}
+
+func (r *Resolver) ResolveOrderProduct(p graphql.ResolveParams) (interface{}, error) {
+	order, ok := p.Source.(models.Order)
+	if !ok {
+		return nil, nil
+	}
+
+	ctx := p.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	product, err := r.productService.GetProductByID(ctx, order.ProductID)
+	if err != nil {
+		log.Error(ctx, r.logger, "resolver: order.product failed", zap.String("product_id", order.ProductID), zap.Error(err))
+		return nil, err
+	}
+
+	return product, nil
+}
+
+func (r *Resolver) ResolveOrderTotalPrice(p graphql.ResolveParams) (interface{}, error) {
+	order, ok := p.Source.(models.Order)
+	if !ok {
+		return nil, nil
+	}
+
+	return order.Amount, nil
+}
+
+func (r *Resolver) ResolveOrderCreatedAt(p graphql.ResolveParams) (interface{}, error) {
+	order, ok := p.Source.(models.Order)
+	if !ok {
+		return nil, nil
+	}
+
+	return order.CreatedAt.Format(time.RFC3339), nil
 }

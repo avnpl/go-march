@@ -32,5 +32,16 @@ func GetQueryFields(resolver *Resolver) graphql.Fields {
 				},
 			},
 		},
+		"getOrderByID": &graphql.Field{
+			Type: NewOrderType(resolver),
+			Args: graphql.FieldConfigArgument{
+				"id": &graphql.ArgumentConfig{
+					Type:        graphql.NewNonNull(graphql.String),
+					Description: "The ID of the order to fetch",
+				},
+			},
+			Resolve:     resolver.GetOrderByID,
+			Description: "Fetch a single order by ID",
+		},
 	}
 }

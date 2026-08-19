@@ -6,8 +6,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func CreateNewSchema(productService services.ProductService, logger *zap.Logger) (graphql.Schema, error) {
-	resolver := NewResolver(productService, logger)
+func CreateNewSchema(productService services.ProductService, orderService services.OrderService, logger *zap.Logger) (graphql.Schema, error) {
+	resolver := NewResolver(productService, orderService, logger)
 
 	queryType := graphql.NewObject(graphql.ObjectConfig{
 		Name:   "Query",
