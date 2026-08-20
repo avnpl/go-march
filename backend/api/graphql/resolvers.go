@@ -177,3 +177,28 @@ func (r *Resolver) ResolveOrderProduct(p graphql.ResolveParams) (interface{}, er
 
 	return product, nil
 }
+
+func (r *Resolver) GetAllOrders(p graphql.ResolveParams) (interface{}, error) {
+	limit := 10
+	offset := 0
+
+	if limitVal, ok := p.Args["limit"].(int); ok {
+		limit = limitVal
+	}
+	if offsetVal, ok := p.Args["offset"].(int); ok {
+		offset = offsetVal
+	}
+
+	ctx := p.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	products, err := r.orderService.FetchAll(ctx, limit, offset)
+	if err != nil {
+		log.Error(ctx, r.logger, "resolver: fetchAllProducts failed", zap.Error(err))
+		return nil, err
+	}
+
+	return products, nil
+}
