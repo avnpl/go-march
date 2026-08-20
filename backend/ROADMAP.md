@@ -19,7 +19,7 @@ Phase 5   Cleanup + Documentation ─────── reset mechanism + README
 Phase 6   User Authentication ─────────── token-based auth with middleware
 ```
 
-**Current status**: Product CRUD complete. Order CRUD complete.
+**Current status**: Product CRUD complete. Order CRUD complete. GraphQL `getOrderByID` with nested `product` is live. Phase 2 list/filter query is not done.
 
 ## Progress Summary
 
@@ -28,7 +28,7 @@ Phase 6   User Authentication ─────────── token-based auth
 | **Phase 1.1** | ✅ Complete | Product CRUD with routes (`/products`, `/products/{id}`) + pagination |
 | **Phase 1.2** | ✅ Complete | Order CRUD: POST, GET list, GET by ID. No PATCH/DELETE/Payments. |
 | **Phase 1.3-1.4** | N/A | Out of scope — no payments, no order update/delete |
-| **Phase 2** | 🔶 Minimal | GraphQL has products only |
+| **Phase 2** | 🔶 In Progress | `getOrderByID` + nested `product` resolver. No list/filter query yet. |
 | **Phase 3-4** | ⬜ Not Started | gRPC, WebSocket stubs |
 | **Phase 5** | ⬜ Not Started | TTL, README |
 | **Phase 6** | ⬜ TODO | User authentication with middleware (after Phase 5) |
@@ -154,51 +154,68 @@ Phase 6   User Authentication ─────────── token-based auth
 
 # Phase 2: GraphQL Enhancement
 
+Product queries and mutations were already in the schema before this phase. Phase 2 adds orders. REST still owns create/update/delete for orders.
+
 ## 2.1 GraphQL Schema
 
-**Query**:
+**Query (current)**:
 ```graphql
 type Query {
-  orders(status: String): [Order!]!
-  order(id: ID!): Order
+  getProductByID(id: String!): Product
+  getAllProducts(limit: Int = 10, offset: Int = 0): [Product]
+  getOrderByID(id: String!): Order
 }
 ```
 
-**Mutation**: None (REST handles all mutations)
+**Query (still to add)**:
+```graphql
+type Query {
+  getOrders(status: String, limit: Int = 10, offset: Int = 0): [Order!]!
+}
+```
 
-**Order Type** (with nested product):
+The original spec used `order(id)` / `orders(...)`. The live names follow the product queries (`getProductByID`, `getAllProducts`). Keep that pattern.
+
+**Mutation**: No order mutations. Product `updateProduct` and `deleteProduct` already exist. REST handles order writes.
+
+**Order Type** (live, with nested product):
 ```graphql
 type Order {
-  order_id: ID!
-  product: Product!
-  quantity: Int!
-  total_price: Float!
-  status: String!
+  order_id: String
+  product_id: String
+  quantity: Int
+  amount: Float
+  status: String
   shipping_address: String
   notes: String
-  created_at: String!
+  created_at: String
+  product: Product
 }
 
 type Product {
-  prod_id: ID!
-  prod_name: String!
-  price: Float!
-  stock: Int!
+  prod_id: String
+  prod_name: String
+  price: Float
+  stock: Int
+  created_at: String
+  updated_at: String
 }
 ```
 
+Field names match the Go `Order` struct, so GraphQL can resolve scalars without custom field resolvers. `amount` is the order total. The original spec called this `total_price`. Nested `product` uses a field resolver. `GetOrderByID` returns `models.Order`. Then `ResolveOrderProduct` loads the product via `ProductService.GetProductByID` using `order.ProductID`. GraphQL runs that resolver only when the client asks for `product`.
+
 ## 2.2 Resolver Implementation
 
-- [ ] `orders` query with optional status filter and pagination (same semantics as REST list)
-- [ ] `order` query by ID
-- [ ] Nested `product` resolver in Order type
-- [ ] Use existing `OrderService` from shared layer
+- [ ] `getOrders` query with optional status filter and pagination (same semantics as REST list)
+- [x] `getOrderByID` query
+- [x] Nested `product` resolver on Order (`ResolveOrderProduct`)
+- [x] Use existing `OrderService` from the shared layer (`FetchByID`)
 
 ## 2.3 Integration
 
-- [ ] Register GraphQL endpoint at `/graphql`
-- [ ] Reuse `OrderService` (API-agnostic — same as REST)
-- [ ] Context propagation: HTTP context → resolver → service
+- [x] GraphQL endpoint at `/graphql` (already registered)
+- [x] Reuse `OrderService` (same instance as REST, wired in `main.go`)
+- [x] Context propagation: HTTP `r.Context()` → `gql.Params.Context` → resolver → service
 
 ---
 
