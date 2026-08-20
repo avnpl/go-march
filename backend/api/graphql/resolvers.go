@@ -2,7 +2,6 @@ package graphql
 
 import (
 	"context"
-	"time"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/services"
@@ -177,22 +176,4 @@ func (r *Resolver) ResolveOrderProduct(p graphql.ResolveParams) (interface{}, er
 	}
 
 	return product, nil
-}
-
-func (r *Resolver) ResolveOrderTotalPrice(p graphql.ResolveParams) (interface{}, error) {
-	order, ok := p.Source.(models.Order)
-	if !ok {
-		return nil, nil
-	}
-
-	return order.Amount, nil
-}
-
-func (r *Resolver) ResolveOrderCreatedAt(p graphql.ResolveParams) (interface{}, error) {
-	order, ok := p.Source.(models.Order)
-	if !ok {
-		return nil, nil
-	}
-
-	return order.CreatedAt.Format(time.RFC3339), nil
 }

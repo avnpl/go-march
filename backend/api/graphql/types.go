@@ -55,11 +55,11 @@ func NewOrderType(r *Resolver) *graphql.Object {
 			"order_id":         &graphql.Field{Type: graphql.String},
 			"product_id":       &graphql.Field{Type: graphql.String},
 			"quantity":         &graphql.Field{Type: graphql.Int},
-			"total_price":      &graphql.Field{Type: graphql.Float, Resolve: r.ResolveOrderTotalPrice},
+			"amount":           &graphql.Field{Type: graphql.Float},
 			"status":           &graphql.Field{Type: graphql.String},
 			"shipping_address": &graphql.Field{Type: graphql.String},
 			"notes":            &graphql.Field{Type: graphql.String},
-			"created_at":       &graphql.Field{Type: graphql.String, Resolve: r.ResolveOrderCreatedAt},
+			"created_at":       &graphql.Field{Type: graphql.String},
 			"product": &graphql.Field{
 				Type:    ProductType,
 				Resolve: r.ResolveOrderProduct,
