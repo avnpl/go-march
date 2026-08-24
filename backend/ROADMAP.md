@@ -17,9 +17,10 @@ Phase 3   gRPC Analytics ──────────────── high-p
 Phase 4   WebSocket Real-time ──────────── notifications
 Phase 5   Cleanup + Documentation ─────── reset mechanism + README
 Phase 6   User Authentication ─────────── token-based auth with middleware
+Phase 7   Perf polish ─────────────────── GraphQL nested product batch fetch (after core features)
 ```
 
-**Current status**: Product CRUD complete. Order CRUD complete. GraphQL `getOrderByID` with nested `product` is live. Phase 2 list/filter query is not done.
+**Current status**: Product CRUD complete. Order CRUD complete. Phase 2 GraphQL order queries + nested `product` complete. Next: Phase 3 gRPC.
 
 ## Progress Summary
 
@@ -28,10 +29,11 @@ Phase 6   User Authentication ─────────── token-based auth
 | **Phase 1.1** | ✅ Complete | Product CRUD with routes (`/products`, `/products/{id}`) + pagination |
 | **Phase 1.2** | ✅ Complete | Order CRUD: POST, GET list, GET by ID. No PATCH/DELETE/Payments. |
 | **Phase 1.3-1.4** | N/A | Out of scope — no payments, no order update/delete |
-| **Phase 2** | 🔶 In Progress | `getOrderByID` + nested `product` resolver. No list/filter query yet. |
+| **Phase 2** | ✅ Complete | `getOrderByID`, `getAllOrders`, nested `product` (still 1+N; batch fetch is Phase 7) |
 | **Phase 3-4** | ⬜ Not Started | gRPC, WebSocket stubs |
 | **Phase 5** | ⬜ Not Started | TTL, README |
 | **Phase 6** | ⬜ TODO | User authentication with middleware (after Phase 5) |
+| **Phase 7** | ⬜ Later | Nested product batch-by-IDs (after Phases 3–6) |
 
 **Legend**: ✅ Complete | 🔶 In Progress | ⬜ Not Started
 
@@ -164,13 +166,7 @@ type Query {
   getProductByID(id: String!): Product
   getAllProducts(limit: Int = 10, offset: Int = 0): [Product]
   getOrderByID(id: String!): Order
-}
-```
-
-**Query (still to add)**:
-```graphql
-type Query {
-  getOrders(status: String, limit: Int = 10, offset: Int = 0): [Order!]!
+  getAllOrders(limit: Int = 10, offset: Int = 0): [Order]
 }
 ```
 
@@ -202,14 +198,14 @@ type Product {
 }
 ```
 
-Field names match the Go `Order` struct, so GraphQL can resolve scalars without custom field resolvers. `amount` is the order total. The original spec called this `total_price`. Nested `product` uses a field resolver. `GetOrderByID` returns `models.Order`. Then `ResolveOrderProduct` loads the product via `ProductService.GetProductByID` using `order.ProductID`. GraphQL runs that resolver only when the client asks for `product`.
+Field names match the Go `Order` struct, so GraphQL can resolve scalars without custom field resolvers. `amount` is the order total. The original spec called this `total_price`. Nested `product` uses a field resolver. `GetOrderByID` / `GetAllOrders` return `models.Order`. Then `ResolveOrderProduct` loads the product via `ProductService.GetProductByID` using `order.ProductID`. GraphQL runs that resolver only when the client asks for `product`. That path is **1+N** today (one product query per order). Batch-by-IDs is Phase 7, after the core feature phases.
 
 ## 2.2 Resolver Implementation
 
-- [ ] `getOrders` query with optional status filter and pagination (same semantics as REST list)
+- [x] `getAllOrders` query with pagination (`limit` / `offset`, same style as REST list)
 - [x] `getOrderByID` query
 - [x] Nested `product` resolver on Order (`ResolveOrderProduct`)
-- [x] Use existing `OrderService` from the shared layer (`FetchByID`)
+- [x] Use existing `OrderService` from the shared layer (`FetchByID` / `FetchAll`)
 
 ## 2.3 Integration
 
@@ -400,6 +396,25 @@ message ProductStat {
 - [ ] Modify service layer to accept `user_id` context
 - [ ] Middleware to validate token and extract `user_id`
 - [ ] Pass `user_id` through context to service/repo layer
+
+---
+
+# Phase 7: Perf polish (after Phases 3–6)
+
+Do this only after REST, GraphQL, gRPC, WebSocket, cleanup/docs, and auth are in place. Not part of Phase 2.
+
+## 7.1 GraphQL nested product: batch by IDs
+
+**Current behavior**: When a client selects `product` under a list of orders, GraphQL runs `ResolveOrderProduct` once per order. That is **1 query for orders + N queries for products** (1+N).
+
+**Fix (no DataLoader required)**: batch fetch by product IDs.
+
+- [ ] Add `FetchByIDs` / `GetProductsByIDs` (`WHERE prod_id IN (...)`)
+- [ ] In `GetAllOrders` / `GetOrderByID`, collect unique `product_id`s and load products in one trip
+- [ ] Stash `map[productID]Product` (request context or richer source)
+- [ ] Change `ResolveOrderProduct` to map lookup only (no per-order DB call)
+
+Target shape: **1 query for orders + 1 query for products**.
 
 ---
 
