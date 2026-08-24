@@ -194,11 +194,11 @@ func (r *Resolver) GetAllOrders(p graphql.ResolveParams) (interface{}, error) {
 		ctx = context.Background()
 	}
 
-	products, err := r.orderService.FetchAll(ctx, limit, offset)
+	orders, err := r.orderService.FetchAll(ctx, limit, offset)
 	if err != nil {
-		log.Error(ctx, r.logger, "resolver: fetchAllProducts failed", zap.Error(err))
+		log.Error(ctx, r.logger, "resolver: GetAllOrders failed", zap.Error(err))
 		return nil, err
 	}
 
-	return products, nil
+	return orders, nil
 }
