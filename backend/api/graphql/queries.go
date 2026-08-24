@@ -5,6 +5,8 @@ import (
 )
 
 func GetQueryFields(resolver *Resolver) graphql.Fields {
+	orderType := NewOrderType(resolver)
+
 	return graphql.Fields{
 		"getProductByID": &graphql.Field{
 			Type: ProductType,
@@ -21,6 +23,32 @@ func GetQueryFields(resolver *Resolver) graphql.Fields {
 			Type:        graphql.NewList(ProductType),
 			Resolve:     resolver.GetAllProducts,
 			Description: "Fetch all products",
+			Args: graphql.FieldConfigArgument{
+				"limit": &graphql.ArgumentConfig{
+					Type:         graphql.Int,
+					DefaultValue: 10,
+				},
+				"offset": &graphql.ArgumentConfig{
+					Type:         graphql.Int,
+					DefaultValue: 0,
+				},
+			},
+		},
+		"getOrderByID": &graphql.Field{
+			Type: orderType,
+			Args: graphql.FieldConfigArgument{
+				"id": &graphql.ArgumentConfig{
+					Type:        graphql.NewNonNull(graphql.String),
+					Description: "The ID of the order to fetch",
+				},
+			},
+			Resolve:     resolver.GetOrderByID,
+			Description: "Fetch a single order by ID",
+		},
+		"getAllOrders": &graphql.Field{
+			Type:        graphql.NewList(orderType),
+			Resolve:     resolver.GetAllOrders,
+			Description: "Fetch all orders",
 			Args: graphql.FieldConfigArgument{
 				"limit": &graphql.ArgumentConfig{
 					Type:         graphql.Int,

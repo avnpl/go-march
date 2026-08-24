@@ -15,8 +15,8 @@ type GraphQLHandler struct {
 	logger *zap.Logger
 }
 
-func NewGraphQLHandler(productService services.ProductService, logger *zap.Logger) GraphQLHandler {
-	schema, err := CreateNewSchema(productService, logger)
+func NewGraphQLHandler(productService services.ProductService, orderService services.OrderService, logger *zap.Logger) GraphQLHandler {
+	schema, err := CreateNewSchema(productService, orderService, logger)
 	if err != nil {
 		logger.Fatal("failed to instantiate GraphQL Schema", zap.Error(err))
 	}

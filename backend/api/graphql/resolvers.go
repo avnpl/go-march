@@ -12,12 +12,14 @@ import (
 
 type Resolver struct {
 	productService services.ProductService
+	orderService   services.OrderService
 	logger         *zap.Logger
 }
 
-func NewResolver(productService services.ProductService, logger *zap.Logger) *Resolver {
+func NewResolver(productService services.ProductService, orderService services.OrderService, logger *zap.Logger) *Resolver {
 	return &Resolver{
 		productService: productService,
+		orderService:   orderService,
 		logger:         logger,
 	}
 }
@@ -133,4 +135,70 @@ func (r *Resolver) DeleteProduct(p graphql.ResolveParams) (interface{}, error) {
 	}
 
 	return product, nil
+}
+
+func (r *Resolver) GetOrderByID(p graphql.ResolveParams) (interface{}, error) {
+
+	idStr, ok := p.Args["id"].(string)
+	if !ok {
+		return nil, nil
+	}
+
+	ctx := p.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	order, err := r.orderService.FetchByID(ctx, idStr)
+	if err != nil {
+		log.Error(ctx, r.logger, "resolver: getOrderByID failed", zap.String("id", idStr), zap.Error(err))
+		return nil, err
+	}
+
+	return order, nil
+}
+
+func (r *Resolver) ResolveOrderProduct(p graphql.ResolveParams) (interface{}, error) {
+	order, ok := p.Source.(models.Order)
+	if !ok {
+		return nil, nil
+	}
+
+	ctx := p.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	product, err := r.productService.GetProductByID(ctx, order.ProductID)
+	if err != nil {
+		log.Error(ctx, r.logger, "resolver: order.product failed", zap.String("product_id", order.ProductID), zap.Error(err))
+		return nil, err
+	}
+
+	return product, nil
+}
+
+func (r *Resolver) GetAllOrders(p graphql.ResolveParams) (interface{}, error) {
+	limit := 10
+	offset := 0
+
+	if limitVal, ok := p.Args["limit"].(int); ok {
+		limit = limitVal
+	}
+	if offsetVal, ok := p.Args["offset"].(int); ok {
+		offset = offsetVal
+	}
+
+	ctx := p.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	orders, err := r.orderService.FetchAll(ctx, limit, offset)
+	if err != nil {
+		log.Error(ctx, r.logger, "resolver: GetAllOrders failed", zap.Error(err))
+		return nil, err
+	}
+
+	return orders, nil
 }

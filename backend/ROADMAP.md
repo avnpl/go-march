@@ -17,9 +17,10 @@ Phase 3   gRPC Analytics ──────────────── high-p
 Phase 4   WebSocket Real-time ──────────── notifications
 Phase 5   Cleanup + Documentation ─────── reset mechanism + README
 Phase 6   User Authentication ─────────── token-based auth with middleware
+Phase 7   Perf polish ─────────────────── GraphQL nested product batch fetch (after core features)
 ```
 
-**Current status**: Product CRUD complete. Order CRUD complete.
+**Current status**: Product CRUD complete. Order CRUD complete. Phase 2 GraphQL order queries + nested `product` complete. Next: Phase 3 gRPC.
 
 ## Progress Summary
 
@@ -28,10 +29,11 @@ Phase 6   User Authentication ─────────── token-based auth
 | **Phase 1.1** | ✅ Complete | Product CRUD with routes (`/products`, `/products/{id}`) + pagination |
 | **Phase 1.2** | ✅ Complete | Order CRUD: POST, GET list, GET by ID. No PATCH/DELETE/Payments. |
 | **Phase 1.3-1.4** | N/A | Out of scope — no payments, no order update/delete |
-| **Phase 2** | 🔶 Minimal | GraphQL has products only |
+| **Phase 2** | ✅ Complete | `getOrderByID`, `getAllOrders`, nested `product` (still 1+N; batch fetch is Phase 7) |
 | **Phase 3-4** | ⬜ Not Started | gRPC, WebSocket stubs |
 | **Phase 5** | ⬜ Not Started | TTL, README |
 | **Phase 6** | ⬜ TODO | User authentication with middleware (after Phase 5) |
+| **Phase 7** | ⬜ Later | Nested product batch-by-IDs (after Phases 3–6) |
 
 **Legend**: ✅ Complete | 🔶 In Progress | ⬜ Not Started
 
@@ -154,51 +156,62 @@ Phase 6   User Authentication ─────────── token-based auth
 
 # Phase 2: GraphQL Enhancement
 
+Product queries and mutations were already in the schema before this phase. Phase 2 adds orders. REST still owns create/update/delete for orders.
+
 ## 2.1 GraphQL Schema
 
-**Query**:
+**Query (current)**:
 ```graphql
 type Query {
-  orders(status: String): [Order!]!
-  order(id: ID!): Order
+  getProductByID(id: String!): Product
+  getAllProducts(limit: Int = 10, offset: Int = 0): [Product]
+  getOrderByID(id: String!): Order
+  getAllOrders(limit: Int = 10, offset: Int = 0): [Order]
 }
 ```
 
-**Mutation**: None (REST handles all mutations)
+The original spec used `order(id)` / `orders(...)`. The live names follow the product queries (`getProductByID`, `getAllProducts`). Keep that pattern.
 
-**Order Type** (with nested product):
+**Mutation**: No order mutations. Product `updateProduct` and `deleteProduct` already exist. REST handles order writes.
+
+**Order Type** (live, with nested product):
 ```graphql
 type Order {
-  order_id: ID!
-  product: Product!
-  quantity: Int!
-  total_price: Float!
-  status: String!
+  order_id: String
+  product_id: String
+  quantity: Int
+  amount: Float
+  status: String
   shipping_address: String
   notes: String
-  created_at: String!
+  created_at: String
+  product: Product
 }
 
 type Product {
-  prod_id: ID!
-  prod_name: String!
-  price: Float!
-  stock: Int!
+  prod_id: String
+  prod_name: String
+  price: Float
+  stock: Int
+  created_at: String
+  updated_at: String
 }
 ```
 
+Field names match the Go `Order` struct, so GraphQL can resolve scalars without custom field resolvers. `amount` is the order total. The original spec called this `total_price`. Nested `product` uses a field resolver. `GetOrderByID` / `GetAllOrders` return `models.Order`. Then `ResolveOrderProduct` loads the product via `ProductService.GetProductByID` using `order.ProductID`. GraphQL runs that resolver only when the client asks for `product`. That path is **1+N** today (one product query per order). Batch-by-IDs is Phase 7, after the core feature phases.
+
 ## 2.2 Resolver Implementation
 
-- [ ] `orders` query with optional status filter and pagination (same semantics as REST list)
-- [ ] `order` query by ID
-- [ ] Nested `product` resolver in Order type
-- [ ] Use existing `OrderService` from shared layer
+- [x] `getAllOrders` query with pagination (`limit` / `offset`, same style as REST list)
+- [x] `getOrderByID` query
+- [x] Nested `product` resolver on Order (`ResolveOrderProduct`)
+- [x] Use existing `OrderService` from the shared layer (`FetchByID` / `FetchAll`)
 
 ## 2.3 Integration
 
-- [ ] Register GraphQL endpoint at `/graphql`
-- [ ] Reuse `OrderService` (API-agnostic — same as REST)
-- [ ] Context propagation: HTTP context → resolver → service
+- [x] GraphQL endpoint at `/graphql` (already registered)
+- [x] Reuse `OrderService` (same instance as REST, wired in `main.go`)
+- [x] Context propagation: HTTP `r.Context()` → `gql.Params.Context` → resolver → service
 
 ---
 
@@ -383,6 +396,25 @@ message ProductStat {
 - [ ] Modify service layer to accept `user_id` context
 - [ ] Middleware to validate token and extract `user_id`
 - [ ] Pass `user_id` through context to service/repo layer
+
+---
+
+# Phase 7: Perf polish (after Phases 3–6)
+
+Do this only after REST, GraphQL, gRPC, WebSocket, cleanup/docs, and auth are in place. Not part of Phase 2.
+
+## 7.1 GraphQL nested product: batch by IDs
+
+**Current behavior**: When a client selects `product` under a list of orders, GraphQL runs `ResolveOrderProduct` once per order. That is **1 query for orders + N queries for products** (1+N).
+
+**Fix (no DataLoader required)**: batch fetch by product IDs.
+
+- [ ] Add `FetchByIDs` / `GetProductsByIDs` (`WHERE prod_id IN (...)`)
+- [ ] In `GetAllOrders` / `GetOrderByID`, collect unique `product_id`s and load products in one trip
+- [ ] Stash `map[productID]Product` (request context or richer source)
+- [ ] Change `ResolveOrderProduct` to map lookup only (no per-order DB call)
+
+Target shape: **1 query for orders + 1 query for products**.
 
 ---
 

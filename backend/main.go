@@ -41,12 +41,14 @@ func main() {
 	productRepo := repos.NewProductRepo(db, logger)
 	productService := services.NewProductService(productRepo, logger)
 	productHandler := rest.NewProductHandler(productService, logger, validate)
-	gqlHandler := graphql.NewGraphQLHandler(productService, logger)
 
 	// Initialize the Order layers
 	orderRepo := repos.NewOrderRepo(db, logger)
 	orderService := services.NewOrderService(orderRepo, productRepo, logger)
 	orderHandler := rest.NewOrderHandler(orderService, logger, validate)
+
+	// Initialize the GraphQL handler
+	gqlHandler := graphql.NewGraphQLHandler(productService, orderService, logger)
 
 	// Set up the HTTP server
 	mux := http.NewServeMux()
