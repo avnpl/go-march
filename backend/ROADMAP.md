@@ -20,7 +20,7 @@ Phase 6   User Authentication ─────────── token-based auth
 Phase 7   Perf polish ─────────────────── GraphQL nested product batch fetch (after core features)
 ```
 
-**Current status**: Product CRUD complete. Order CRUD complete. Phase 2 GraphQL order queries + nested `product` complete. Next: Phase 3 gRPC.
+**Current status**: Product CRUD complete. Order CRUD complete. Phase 2 GraphQL order queries + nested `product` complete. Phase 3 gRPC started: proto scaffolding + codegen for `GetTotalSales` only, server/service layers still empty (see Phase 3 for details).
 
 ## Progress Summary
 
@@ -30,7 +30,8 @@ Phase 7   Perf polish ─────────────────── 
 | **Phase 1.2** | ✅ Complete | Order CRUD: POST, GET list, GET by ID. No PATCH/DELETE/Payments. |
 | **Phase 1.3-1.4** | N/A | Out of scope — no payments, no order update/delete |
 | **Phase 2** | ✅ Complete | `getOrderByID`, `getAllOrders`, nested `product` (still 1+N; batch fetch is Phase 7) |
-| **Phase 3-4** | ⬜ Not Started | gRPC, WebSocket stubs |
+| **Phase 3** | 🔶 In Progress | Proto + codegen started (`GetTotalSales` only); server/service layers empty; see Phase 3 |
+| **Phase 4** | ⬜ Not Started | WebSocket stubs |
 | **Phase 5** | ⬜ Not Started | TTL, README |
 | **Phase 6** | ⬜ TODO | User authentication with middleware (after Phase 5) |
 | **Phase 7** | ⬜ Later | Nested product batch-by-IDs (after Phases 3–6) |
@@ -217,23 +218,28 @@ Field names match the Go `Order` struct, so GraphQL can resolve scalars without 
 
 # Phase 3: gRPC Analytics
 
+**Status**: 🔶 In Progress — proto scaffolding + codegen started, no server/service logic wired yet.
+
 ## 3.1 Protocol Buffer Definition
 
-**File**: `proto/analytics.proto`
+**File**: `proto/AnalyticsService.proto` (actual path, not `proto/analytics.proto` as originally written)
 
+**Target full schema** (add the 3 missing RPCs/messages to the existing proto, then regenerate):
 ```protobuf
 service AnalyticsService {
-  rpc GetTotalSales(GetTotalSalesRequest) returns (GetTotalSalesResponse);
-  rpc GetAverageOrderValue(GetAverageOrderValueRequest) returns (GetAverageOrderValueResponse);
-  rpc GetTopProducts(GetTopProductsRequest) returns (stream ProductStat);
-  rpc GetLowStockProducts(GetLowStockProductsRequest) returns (stream ProductStat);
+  rpc GetTotalSales(GetTotalSalesRequest) returns (GetTotalSalesResponse);          // done
+  rpc GetAverageOrderValue(GetAverageOrderValueRequest) returns (GetAverageOrderValueResponse); // TODO
+  rpc GetTopProducts(GetTopProductsRequest) returns (stream ProductStat);           // TODO
+  rpc GetLowStockProducts(GetLowStockProductsRequest) returns (stream ProductStat); // TODO
 }
 ```
 
-**Messages**:
+**Messages** (`GetTotalSalesRequest`/`Response` already defined; the rest are TODO):
 ```protobuf
+// existing
 message GetTotalSalesRequest {
-  // optional date range
+  google.protobuf.Timestamp start_date = 1;
+  google.protobuf.Timestamp end_date = 2;
 }
 
 message GetTotalSalesResponse {
@@ -241,26 +247,53 @@ message GetTotalSalesResponse {
   double total_revenue = 2;
 }
 
+// TODO
+message GetAverageOrderValueRequest {
+  google.protobuf.Timestamp start_date = 1;
+  google.protobuf.Timestamp end_date = 2;
+}
+
+message GetAverageOrderValueResponse {
+  double average_order_value = 1;
+}
+
+message GetTopProductsRequest {
+  int32 limit = 1; // default 10
+}
+
+message GetLowStockProductsRequest {
+  int32 threshold = 1; // stock <= threshold
+}
+
 message ProductStat {
-  int64 product_id = 1;
+  string product_id = 1;   // matches models.Product string ID (PR-XXXXXX), not int64
   string product_name = 2;
-  int64 units_sold = 3;
-  double revenue = 4;
+  int64 units_sold = 3;    // unset/0 for GetLowStockProducts
+  double revenue = 4;      // unset/0 for GetLowStockProducts
+  int32 stock = 5;         // only populated for GetLowStockProducts
 }
 ```
 
-## 3.2 Implementation
+> Note: original spec used `int64 product_id` in `ProductStat` — corrected to `string` here since `Product.ProductID` is a string (`PR-XXXXXX`) everywhere else in this codebase.
 
-- [ ] Generate Go code from proto
-- [ ] Create `AnalyticsService` in `services/`
-- [ ] Add aggregate SQL queries to repo
-- [ ] Implement gRPC server in `api/grpc/`
-- [ ] Run on separate port (`:50051`)
+## 3.2 Implementation Steps (in order)
 
-## 3.3 Streaming (Optional)
+- [ ] **Fix proto `go_package`** to `github.com/avnpl/go-march/api/grpc`
+- [ ] **Add `google.golang.org/grpc` to `go.mod`** (`go get google.golang.org/grpc`, then `go mod tidy`)
+- [ ] **Extend `AnalyticsService.proto`** with the 3 missing RPCs/messages above, regenerate `.pb.go` / `_grpc.pb.go`
+- [ ] **Add aggregate SQL to `repos/order_repo.go`** (or a new `AnalyticsRepo` if that fits the layering better):
+  - `GetTotalSales(ctx, start, end time.Time) (totalOrders int64, totalRevenue float64, error)` — `count(*)`, `sum(amount)` over `orders` filtered by `created_at` range
+  - `GetAverageOrderValue(ctx, start, end time.Time) (float64, error)` — `avg(amount)` over the same range (or derive from the two values above — pick one, don't compute both ways)
+  - `GetTopProducts(ctx, limit int) ([]ProductStat, error)` — join `orders` → `products`, `group by product_id`, `sum(quantity)` as units_sold, `sum(amount)` as revenue, `order by units_sold desc`, `limit`
+  - `GetLowStockProducts(ctx, threshold int) ([]Product, error)` — `select * from products where stock <= threshold`
+- [ ] **Implement `services/analytics_service.go`**: `AnalyticsService` interface + impl, mirroring the `ProductService`/`OrderService` pattern — no gRPC-specific types in this layer, plain Go structs in, plain Go structs out
+- [ ] **Implement `api/grpc/server.go`**: struct implementing the generated `AnalyticsServiceServer` interface, each method translates between proto messages and the service layer's plain Go types/errors (map service errors to gRPC `status.Error` codes, don't leak internal errors — same policy as REST)
+- [ ] **Wire into `main.go`**: construct `AnalyticsService`, start a `grpc.NewServer()` on `:50051` (separate `net.Listener`, separate goroutine from the HTTP server), register with `grpc.RegisterAnalyticsServiceServer`, include in graceful shutdown alongside the HTTP server
 
-- [ ] Server-side streaming for top products / low stock
-- [ ] Demonstrates gRPC streaming capability
+## 3.3 Streaming (GetTopProducts / GetLowStockProducts)
+
+- [ ] Implement as server-side streaming RPCs (`stream ProductStat` return type) rather than returning a full slice in one response — send one `ProductStat` per `Send()` call on the stream
+- [ ] Demonstrates gRPC streaming capability (the thing REST/GraphQL can't do naturally)
 
 ---
 
