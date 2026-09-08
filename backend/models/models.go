@@ -15,6 +15,14 @@ type Product struct {
 	TTLExpires sql.NullTime `db:"ttl_expires_at" json:"-"`
 }
 
+type ProductStat struct {
+	ProductID   string  `db:"prod_id" json:"prod_id"`
+	ProductName string  `db:"prod_name" json:"prod_name"`
+	UnitsSold   int64   `db:"units_sold" json:"units_sold"`
+	Revenue     float64 `db:"revenue" json:"revenue"`
+	Stock       int     `db:"stock" json:"stock"`
+}
+
 type Order struct {
 	OrderID         string       `db:"order_id" json:"order_id"`
 	ProductID       string       `db:"product_id" json:"product_id"`
