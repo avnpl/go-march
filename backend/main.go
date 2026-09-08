@@ -84,23 +84,22 @@ func main() {
 
 	// Initialize the Analytics & gRPC layers
 	analyticsService := services.NewAnalyticsService(orderRepo, logger)
-	analyticsHandler := myGrpc.NewAnalyticsHandler(analyticsService)
+	analyticsHandler := myGrpc.NewAnalyticsHandler(analyticsService, logger)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterAnalyticsServiceServer(grpcServer, analyticsHandler)
 
 	// Start the gRPC server in a separate GR
-	// TODO: use zap logger (logger.Info / logger.Fatal) instead of std log
 	go func() {
 		lis, err := net.Listen("tcp", ":9090")
 		if err != nil {
-			log.Fatalf("failed to listen for gRPC: %v", err)
+			logger.Fatal("failed to listen for gRPC", zap.Error(err))
 		}
 
-		log.Println("gRPC server listening on :9090")
+		logger.Info("gRPC server listening on :9090")
 		err = grpcServer.Serve(lis)
 		if err != nil {
-			log.Fatalf("failed to serve gRPC: %v", err)
+			logger.Fatal("failed to serve gRPC", zap.Error(err))
 		}
 	}()
 

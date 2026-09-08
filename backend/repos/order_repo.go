@@ -71,8 +71,7 @@ func (or orderRepo) FetchAll(ctx context.Context, limit int, offset int) ([]mode
 }
 
 func (or orderRepo) GetTotalSales(ctx context.Context, start, end time.Time) (int, float64, error) {
-	// TODO: COALESCE(SUM(amount), 0) — SUM is NULL when no rows, Scan into float64 fails
-	query := "select sum(amount), count(*) from orders where created_at >= $1 and created_at < $2"
+	query := "select coalesce(sum(amount), 0), count(*) from orders where created_at >= $1 and created_at < $2"
 
 	var totalOrders int
 	var totalRevenue float64
