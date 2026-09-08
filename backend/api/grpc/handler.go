@@ -3,9 +3,12 @@ package grpc
 import (
 	"context"
 
+	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	pb "github.com/avnpl/go-march/api/grpc/proto"
 	"github.com/avnpl/go-march/services"
-	"go.uber.org/zap"
 )
 
 type AnalyticsHandler struct {
@@ -21,7 +24,10 @@ func NewAnalyticsHandler(analyticsService services.AnalyticsService, logger *zap
 func (s *AnalyticsHandler) GetTotalSales(ctx context.Context, req *pb.GetTotalSalesRequest) (*pb.GetTotalSalesResponse, error) {
 	s.logger.Info("GetTotalSales called")
 
-	// TODO: reject nil start_date / end_date with status.Error(codes.InvalidArgument, ...)
+	if req.GetStartDate() == nil || req.GetEndDate() == nil {
+		return nil, status.Error(codes.InvalidArgument, "start_date and end_date are required")
+	}
+
 	totalSales, totalRevenue, err := s.analyticsService.GetTotalSales(ctx, req.StartDate.AsTime(), req.EndDate.AsTime())
 	if err != nil {
 		s.logger.Error("GetTotalSales failed", zap.Error(err))

@@ -111,8 +111,26 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	// TODO: check server.Shutdown error; GracefulStop() ignores this 10s timeout
-	server.Shutdown(ctx)
-	grpcServer.GracefulStop()
+
+	// shut down http server
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("HTTP server shutdown failed", zap.Error(err))
+	}
+
+	// shut down the grpc server
+	grpcStopped := make(chan struct{})
+	go func() {
+		grpcServer.GracefulStop()
+		close(grpcStopped)
+	}()
+
+	select {
+	case <-grpcStopped:
+		// do nothing. gRPC server stopped successfully
+	case <-ctx.Done():
+		logger.Error("gRPC server shutdown failed", zap.Error(ctx.Err()))
+		grpcServer.Stop()
+	}
+
 	logger.Info("goodbye")
 }
