@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
@@ -34,6 +35,18 @@ func (m mockOrderRepo) FetchByID(ctx context.Context, id string) (models.Order, 
 
 func (m mockOrderRepo) FetchAll(ctx context.Context, limit int, offset int) ([]models.Order, error) {
 	return m.fetchAllFn(ctx, limit, offset)
+}
+
+func (m mockOrderRepo) GetTotalSales(ctx context.Context, start, end time.Time) (int, float64, error) {
+	return 0, 0, nil
+}
+
+func (m mockOrderRepo) GetAvgOrderValue(ctx context.Context, start, end time.Time) (float64, error) {
+	return 0, nil
+}
+
+func (m mockOrderRepo) GetTopProducts(ctx context.Context, limit int) ([]models.ProductStat, error) {
+	return nil, nil
 }
 
 func (m mockOrderRepo) Delete() {
@@ -74,6 +87,10 @@ func (m orderTestProductRepo) DeleteByID(ctx context.Context, id string) (models
 
 func (m orderTestProductRepo) DecrementStock(txn *sqlx.Tx, ctx context.Context, id string, qty int) (int, error) {
 	return m.decrementStockFn(txn, ctx, id, qty)
+}
+
+func (m orderTestProductRepo) GetLowStockProducts(ctx context.Context, threshold int) ([]models.Product, error) {
+	return nil, nil
 }
 
 func (m orderTestProductRepo) BeginTransaction() (*sqlx.Tx, error) {

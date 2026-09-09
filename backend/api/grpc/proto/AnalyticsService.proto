@@ -7,8 +7,8 @@ option go_package = "github.com/avnpl/go-march/api/grpc";
 service AnalyticsService {
   rpc GetTotalSales(GetTotalSalesRequest) returns (GetTotalSalesResponse);
   rpc GetAverageOrderValue(GetAverageOrderValueRequest) returns (GetAverageOrderValueResponse);
-  rpc GetTopProducts(GetTopProductsRequest) returns (stream ProductStat);
-  rpc GetLowStockProducts(GetLowStockProductsRequest) returns (stream ProductStat);
+  rpc GetTopProducts(GetTopProductsRequest) returns (GetTopProductsResponse);
+  rpc GetLowStockProducts(GetLowStockProductsRequest) returns (GetLowStockProductsResponse);
 }
 
 message GetTotalSalesRequest {
@@ -34,8 +34,16 @@ message GetTopProductsRequest {
   int32 limit = 1;
 }
 
+message GetTopProductsResponse {
+  repeated ProductStat products = 1;
+}
+
 message GetLowStockProductsRequest {
   int32 threshold = 1;
+}
+
+message GetLowStockProductsResponse {
+  repeated ProductStat products = 1;
 }
 
 message ProductStat {

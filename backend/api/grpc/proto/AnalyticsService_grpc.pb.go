@@ -31,8 +31,8 @@ const (
 type AnalyticsServiceClient interface {
 	GetTotalSales(ctx context.Context, in *GetTotalSalesRequest, opts ...grpc.CallOption) (*GetTotalSalesResponse, error)
 	GetAverageOrderValue(ctx context.Context, in *GetAverageOrderValueRequest, opts ...grpc.CallOption) (*GetAverageOrderValueResponse, error)
-	GetTopProducts(ctx context.Context, in *GetTopProductsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ProductStat], error)
-	GetLowStockProducts(ctx context.Context, in *GetLowStockProductsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ProductStat], error)
+	GetTopProducts(ctx context.Context, in *GetTopProductsRequest, opts ...grpc.CallOption) (*GetTopProductsResponse, error)
+	GetLowStockProducts(ctx context.Context, in *GetLowStockProductsRequest, opts ...grpc.CallOption) (*GetLowStockProductsResponse, error)
 }
 
 type analyticsServiceClient struct {
@@ -63,43 +63,25 @@ func (c *analyticsServiceClient) GetAverageOrderValue(ctx context.Context, in *G
 	return out, nil
 }
 
-func (c *analyticsServiceClient) GetTopProducts(ctx context.Context, in *GetTopProductsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ProductStat], error) {
+func (c *analyticsServiceClient) GetTopProducts(ctx context.Context, in *GetTopProductsRequest, opts ...grpc.CallOption) (*GetTopProductsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AnalyticsService_ServiceDesc.Streams[0], AnalyticsService_GetTopProducts_FullMethodName, cOpts...)
+	out := new(GetTopProductsResponse)
+	err := c.cc.Invoke(ctx, AnalyticsService_GetTopProducts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetTopProductsRequest, ProductStat]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AnalyticsService_GetTopProductsClient = grpc.ServerStreamingClient[ProductStat]
-
-func (c *analyticsServiceClient) GetLowStockProducts(ctx context.Context, in *GetLowStockProductsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ProductStat], error) {
+func (c *analyticsServiceClient) GetLowStockProducts(ctx context.Context, in *GetLowStockProductsRequest, opts ...grpc.CallOption) (*GetLowStockProductsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &AnalyticsService_ServiceDesc.Streams[1], AnalyticsService_GetLowStockProducts_FullMethodName, cOpts...)
+	out := new(GetLowStockProductsResponse)
+	err := c.cc.Invoke(ctx, AnalyticsService_GetLowStockProducts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetLowStockProductsRequest, ProductStat]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AnalyticsService_GetLowStockProductsClient = grpc.ServerStreamingClient[ProductStat]
 
 // AnalyticsServiceServer is the server API for AnalyticsService service.
 // All implementations must embed UnimplementedAnalyticsServiceServer
@@ -107,8 +89,8 @@ type AnalyticsService_GetLowStockProductsClient = grpc.ServerStreamingClient[Pro
 type AnalyticsServiceServer interface {
 	GetTotalSales(context.Context, *GetTotalSalesRequest) (*GetTotalSalesResponse, error)
 	GetAverageOrderValue(context.Context, *GetAverageOrderValueRequest) (*GetAverageOrderValueResponse, error)
-	GetTopProducts(*GetTopProductsRequest, grpc.ServerStreamingServer[ProductStat]) error
-	GetLowStockProducts(*GetLowStockProductsRequest, grpc.ServerStreamingServer[ProductStat]) error
+	GetTopProducts(context.Context, *GetTopProductsRequest) (*GetTopProductsResponse, error)
+	GetLowStockProducts(context.Context, *GetLowStockProductsRequest) (*GetLowStockProductsResponse, error)
 	mustEmbedUnimplementedAnalyticsServiceServer()
 }
 
@@ -125,11 +107,11 @@ func (UnimplementedAnalyticsServiceServer) GetTotalSales(context.Context, *GetTo
 func (UnimplementedAnalyticsServiceServer) GetAverageOrderValue(context.Context, *GetAverageOrderValueRequest) (*GetAverageOrderValueResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAverageOrderValue not implemented")
 }
-func (UnimplementedAnalyticsServiceServer) GetTopProducts(*GetTopProductsRequest, grpc.ServerStreamingServer[ProductStat]) error {
-	return status.Error(codes.Unimplemented, "method GetTopProducts not implemented")
+func (UnimplementedAnalyticsServiceServer) GetTopProducts(context.Context, *GetTopProductsRequest) (*GetTopProductsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTopProducts not implemented")
 }
-func (UnimplementedAnalyticsServiceServer) GetLowStockProducts(*GetLowStockProductsRequest, grpc.ServerStreamingServer[ProductStat]) error {
-	return status.Error(codes.Unimplemented, "method GetLowStockProducts not implemented")
+func (UnimplementedAnalyticsServiceServer) GetLowStockProducts(context.Context, *GetLowStockProductsRequest) (*GetLowStockProductsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetLowStockProducts not implemented")
 }
 func (UnimplementedAnalyticsServiceServer) mustEmbedUnimplementedAnalyticsServiceServer() {}
 func (UnimplementedAnalyticsServiceServer) testEmbeddedByValue()                          {}
@@ -188,27 +170,41 @@ func _AnalyticsService_GetAverageOrderValue_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AnalyticsService_GetTopProducts_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetTopProductsRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _AnalyticsService_GetTopProducts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTopProductsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(AnalyticsServiceServer).GetTopProducts(m, &grpc.GenericServerStream[GetTopProductsRequest, ProductStat]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(AnalyticsServiceServer).GetTopProducts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnalyticsService_GetTopProducts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnalyticsServiceServer).GetTopProducts(ctx, req.(*GetTopProductsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AnalyticsService_GetTopProductsServer = grpc.ServerStreamingServer[ProductStat]
-
-func _AnalyticsService_GetLowStockProducts_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetLowStockProductsRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _AnalyticsService_GetLowStockProducts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLowStockProductsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(AnalyticsServiceServer).GetLowStockProducts(m, &grpc.GenericServerStream[GetLowStockProductsRequest, ProductStat]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(AnalyticsServiceServer).GetLowStockProducts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnalyticsService_GetLowStockProducts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnalyticsServiceServer).GetLowStockProducts(ctx, req.(*GetLowStockProductsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type AnalyticsService_GetLowStockProductsServer = grpc.ServerStreamingServer[ProductStat]
 
 // AnalyticsService_ServiceDesc is the grpc.ServiceDesc for AnalyticsService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -225,18 +221,15 @@ var AnalyticsService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetAverageOrderValue",
 			Handler:    _AnalyticsService_GetAverageOrderValue_Handler,
 		},
-	},
-	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "GetTopProducts",
-			Handler:       _AnalyticsService_GetTopProducts_Handler,
-			ServerStreams: true,
+			MethodName: "GetTopProducts",
+			Handler:    _AnalyticsService_GetTopProducts_Handler,
 		},
 		{
-			StreamName:    "GetLowStockProducts",
-			Handler:       _AnalyticsService_GetLowStockProducts_Handler,
-			ServerStreams: true,
+			MethodName: "GetLowStockProducts",
+			Handler:    _AnalyticsService_GetLowStockProducts_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "proto/AnalyticsService.proto",
 }

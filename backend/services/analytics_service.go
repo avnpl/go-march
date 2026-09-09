@@ -18,12 +18,13 @@ type AnalyticsService interface {
 }
 
 type analyticsService struct {
-	orderRepo repos.OrderRepo
-	log       *zap.Logger
+	orderRepo   repos.OrderRepo
+	productRepo repos.ProductRepo
+	log         *zap.Logger
 }
 
-func NewAnalyticsService(orderRepo repos.OrderRepo, logger *zap.Logger) AnalyticsService {
-	return &analyticsService{orderRepo: orderRepo, log: logger}
+func NewAnalyticsService(orderRepo repos.OrderRepo, productRepo repos.ProductRepo, logger *zap.Logger) AnalyticsService {
+	return &analyticsService{orderRepo: orderRepo, productRepo: productRepo, log: logger}
 }
 
 func (s *analyticsService) GetTotalSales(ctx context.Context, start, end time.Time) (int, float64, error) {
@@ -36,16 +37,28 @@ func (s *analyticsService) GetTotalSales(ctx context.Context, start, end time.Ti
 }
 
 func (s *analyticsService) GetAverageOrderValue(ctx context.Context, start, end time.Time) (float64, error) {
-	// TODO
-	panic("unimplemented")
+	result, err := s.orderRepo.GetAvgOrderValue(ctx, start, end)
+	if err != nil {
+		log.Error(ctx, s.log, "failed to get avg order value", zap.Time("start", start), zap.Time("end", end), zap.Error(err))
+		return 0, err
+	}
+	return result, nil
 }
 
 func (s *analyticsService) GetLowStockProducts(ctx context.Context, threshold int) ([]models.Product, error) {
-	// TODO
-	panic("unimplemented")
+	products, err := s.productRepo.GetLowStockProducts(ctx, threshold)
+	if err != nil {
+		log.Error(ctx, s.log, "failed to get low stock products", zap.Int("threshold", threshold), zap.Error(err))
+		return nil, err
+	}
+	return products, nil
 }
 
 func (s *analyticsService) GetTopProducts(ctx context.Context, limit int) ([]models.ProductStat, error) {
-	// TODO
-	panic("unimplemented")
+	stats, err := s.orderRepo.GetTopProducts(ctx, limit)
+	if err != nil {
+		log.Error(ctx, s.log, "failed to get top products", zap.Int("limit", limit), zap.Error(err))
+		return nil, err
+	}
+	return stats, nil
 }

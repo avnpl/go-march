@@ -83,7 +83,7 @@ func main() {
 	}()
 
 	// Initialize the Analytics & gRPC layers
-	analyticsService := services.NewAnalyticsService(orderRepo, logger)
+	analyticsService := services.NewAnalyticsService(orderRepo, productRepo, logger)
 	analyticsHandler := myGrpc.NewAnalyticsHandler(analyticsService, logger)
 
 	grpcServer := grpc.NewServer()

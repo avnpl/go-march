@@ -266,6 +266,50 @@ func (x *GetTopProductsRequest) GetLimit() int32 {
 	return 0
 }
 
+type GetTopProductsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Products      []*ProductStat         `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTopProductsResponse) Reset() {
+	*x = GetTopProductsResponse{}
+	mi := &file_proto_AnalyticsService_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTopProductsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTopProductsResponse) ProtoMessage() {}
+
+func (x *GetTopProductsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_AnalyticsService_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTopProductsResponse.ProtoReflect.Descriptor instead.
+func (*GetTopProductsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_AnalyticsService_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetTopProductsResponse) GetProducts() []*ProductStat {
+	if x != nil {
+		return x.Products
+	}
+	return nil
+}
+
 type GetLowStockProductsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Threshold     int32                  `protobuf:"varint,1,opt,name=threshold,proto3" json:"threshold,omitempty"`
@@ -275,7 +319,7 @@ type GetLowStockProductsRequest struct {
 
 func (x *GetLowStockProductsRequest) Reset() {
 	*x = GetLowStockProductsRequest{}
-	mi := &file_proto_AnalyticsService_proto_msgTypes[5]
+	mi := &file_proto_AnalyticsService_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -287,7 +331,7 @@ func (x *GetLowStockProductsRequest) String() string {
 func (*GetLowStockProductsRequest) ProtoMessage() {}
 
 func (x *GetLowStockProductsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_AnalyticsService_proto_msgTypes[5]
+	mi := &file_proto_AnalyticsService_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -300,7 +344,7 @@ func (x *GetLowStockProductsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLowStockProductsRequest.ProtoReflect.Descriptor instead.
 func (*GetLowStockProductsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_AnalyticsService_proto_rawDescGZIP(), []int{5}
+	return file_proto_AnalyticsService_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetLowStockProductsRequest) GetThreshold() int32 {
@@ -308,6 +352,50 @@ func (x *GetLowStockProductsRequest) GetThreshold() int32 {
 		return x.Threshold
 	}
 	return 0
+}
+
+type GetLowStockProductsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Products      []*ProductStat         `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetLowStockProductsResponse) Reset() {
+	*x = GetLowStockProductsResponse{}
+	mi := &file_proto_AnalyticsService_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLowStockProductsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLowStockProductsResponse) ProtoMessage() {}
+
+func (x *GetLowStockProductsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_AnalyticsService_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLowStockProductsResponse.ProtoReflect.Descriptor instead.
+func (*GetLowStockProductsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_AnalyticsService_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetLowStockProductsResponse) GetProducts() []*ProductStat {
+	if x != nil {
+		return x.Products
+	}
+	return nil
 }
 
 type ProductStat struct {
@@ -323,7 +411,7 @@ type ProductStat struct {
 
 func (x *ProductStat) Reset() {
 	*x = ProductStat{}
-	mi := &file_proto_AnalyticsService_proto_msgTypes[6]
+	mi := &file_proto_AnalyticsService_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -335,7 +423,7 @@ func (x *ProductStat) String() string {
 func (*ProductStat) ProtoMessage() {}
 
 func (x *ProductStat) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_AnalyticsService_proto_msgTypes[6]
+	mi := &file_proto_AnalyticsService_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -348,7 +436,7 @@ func (x *ProductStat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductStat.ProtoReflect.Descriptor instead.
 func (*ProductStat) Descriptor() ([]byte, []int) {
-	return file_proto_AnalyticsService_proto_rawDescGZIP(), []int{6}
+	return file_proto_AnalyticsService_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ProductStat) GetProductId() string {
@@ -405,9 +493,13 @@ const file_proto_AnalyticsService_proto_rawDesc = "" +
 	"\x1cGetAverageOrderValueResponse\x12.\n" +
 	"\x13average_order_value\x18\x01 \x01(\x01R\x11averageOrderValue\"-\n" +
 	"\x15GetTopProductsRequest\x12\x14\n" +
-	"\x05limit\x18\x01 \x01(\x05R\x05limit\":\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\"L\n" +
+	"\x16GetTopProductsResponse\x122\n" +
+	"\bproducts\x18\x01 \x03(\v2\x16.analytics.ProductStatR\bproducts\":\n" +
 	"\x1aGetLowStockProductsRequest\x12\x1c\n" +
-	"\tthreshold\x18\x01 \x01(\x05R\tthreshold\"\x9e\x01\n" +
+	"\tthreshold\x18\x01 \x01(\x05R\tthreshold\"Q\n" +
+	"\x1bGetLowStockProductsResponse\x122\n" +
+	"\bproducts\x18\x01 \x03(\v2\x16.analytics.ProductStatR\bproducts\"\x9e\x01\n" +
 	"\vProductStat\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tR\tproductId\x12!\n" +
@@ -415,12 +507,12 @@ const file_proto_AnalyticsService_proto_rawDesc = "" +
 	"\n" +
 	"units_sold\x18\x03 \x01(\x03R\tunitsSold\x12\x18\n" +
 	"\arevenue\x18\x04 \x01(\x01R\arevenue\x12\x14\n" +
-	"\x05stock\x18\x05 \x01(\x05R\x05stock2\xf5\x02\n" +
+	"\x05stock\x18\x05 \x01(\x05R\x05stock2\x8c\x03\n" +
 	"\x10AnalyticsService\x12R\n" +
 	"\rGetTotalSales\x12\x1f.analytics.GetTotalSalesRequest\x1a .analytics.GetTotalSalesResponse\x12g\n" +
-	"\x14GetAverageOrderValue\x12&.analytics.GetAverageOrderValueRequest\x1a'.analytics.GetAverageOrderValueResponse\x12L\n" +
-	"\x0eGetTopProducts\x12 .analytics.GetTopProductsRequest\x1a\x16.analytics.ProductStat0\x01\x12V\n" +
-	"\x13GetLowStockProducts\x12%.analytics.GetLowStockProductsRequest\x1a\x16.analytics.ProductStat0\x01B$Z\"github.com/avnpl/go-march/api/grpcb\x06proto3"
+	"\x14GetAverageOrderValue\x12&.analytics.GetAverageOrderValueRequest\x1a'.analytics.GetAverageOrderValueResponse\x12U\n" +
+	"\x0eGetTopProducts\x12 .analytics.GetTopProductsRequest\x1a!.analytics.GetTopProductsResponse\x12d\n" +
+	"\x13GetLowStockProducts\x12%.analytics.GetLowStockProductsRequest\x1a&.analytics.GetLowStockProductsResponseB$Z\"github.com/avnpl/go-march/api/grpcb\x06proto3"
 
 var (
 	file_proto_AnalyticsService_proto_rawDescOnce sync.Once
@@ -434,35 +526,39 @@ func file_proto_AnalyticsService_proto_rawDescGZIP() []byte {
 	return file_proto_AnalyticsService_proto_rawDescData
 }
 
-var file_proto_AnalyticsService_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_proto_AnalyticsService_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_proto_AnalyticsService_proto_goTypes = []any{
 	(*GetTotalSalesRequest)(nil),         // 0: analytics.GetTotalSalesRequest
 	(*GetTotalSalesResponse)(nil),        // 1: analytics.GetTotalSalesResponse
 	(*GetAverageOrderValueRequest)(nil),  // 2: analytics.GetAverageOrderValueRequest
 	(*GetAverageOrderValueResponse)(nil), // 3: analytics.GetAverageOrderValueResponse
 	(*GetTopProductsRequest)(nil),        // 4: analytics.GetTopProductsRequest
-	(*GetLowStockProductsRequest)(nil),   // 5: analytics.GetLowStockProductsRequest
-	(*ProductStat)(nil),                  // 6: analytics.ProductStat
-	(*timestamppb.Timestamp)(nil),        // 7: google.protobuf.Timestamp
+	(*GetTopProductsResponse)(nil),       // 5: analytics.GetTopProductsResponse
+	(*GetLowStockProductsRequest)(nil),   // 6: analytics.GetLowStockProductsRequest
+	(*GetLowStockProductsResponse)(nil),  // 7: analytics.GetLowStockProductsResponse
+	(*ProductStat)(nil),                  // 8: analytics.ProductStat
+	(*timestamppb.Timestamp)(nil),        // 9: google.protobuf.Timestamp
 }
 var file_proto_AnalyticsService_proto_depIdxs = []int32{
-	7, // 0: analytics.GetTotalSalesRequest.start_date:type_name -> google.protobuf.Timestamp
-	7, // 1: analytics.GetTotalSalesRequest.end_date:type_name -> google.protobuf.Timestamp
-	7, // 2: analytics.GetAverageOrderValueRequest.start_date:type_name -> google.protobuf.Timestamp
-	7, // 3: analytics.GetAverageOrderValueRequest.end_date:type_name -> google.protobuf.Timestamp
-	0, // 4: analytics.AnalyticsService.GetTotalSales:input_type -> analytics.GetTotalSalesRequest
-	2, // 5: analytics.AnalyticsService.GetAverageOrderValue:input_type -> analytics.GetAverageOrderValueRequest
-	4, // 6: analytics.AnalyticsService.GetTopProducts:input_type -> analytics.GetTopProductsRequest
-	5, // 7: analytics.AnalyticsService.GetLowStockProducts:input_type -> analytics.GetLowStockProductsRequest
-	1, // 8: analytics.AnalyticsService.GetTotalSales:output_type -> analytics.GetTotalSalesResponse
-	3, // 9: analytics.AnalyticsService.GetAverageOrderValue:output_type -> analytics.GetAverageOrderValueResponse
-	6, // 10: analytics.AnalyticsService.GetTopProducts:output_type -> analytics.ProductStat
-	6, // 11: analytics.AnalyticsService.GetLowStockProducts:output_type -> analytics.ProductStat
-	8, // [8:12] is the sub-list for method output_type
-	4, // [4:8] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	9,  // 0: analytics.GetTotalSalesRequest.start_date:type_name -> google.protobuf.Timestamp
+	9,  // 1: analytics.GetTotalSalesRequest.end_date:type_name -> google.protobuf.Timestamp
+	9,  // 2: analytics.GetAverageOrderValueRequest.start_date:type_name -> google.protobuf.Timestamp
+	9,  // 3: analytics.GetAverageOrderValueRequest.end_date:type_name -> google.protobuf.Timestamp
+	8,  // 4: analytics.GetTopProductsResponse.products:type_name -> analytics.ProductStat
+	8,  // 5: analytics.GetLowStockProductsResponse.products:type_name -> analytics.ProductStat
+	0,  // 6: analytics.AnalyticsService.GetTotalSales:input_type -> analytics.GetTotalSalesRequest
+	2,  // 7: analytics.AnalyticsService.GetAverageOrderValue:input_type -> analytics.GetAverageOrderValueRequest
+	4,  // 8: analytics.AnalyticsService.GetTopProducts:input_type -> analytics.GetTopProductsRequest
+	6,  // 9: analytics.AnalyticsService.GetLowStockProducts:input_type -> analytics.GetLowStockProductsRequest
+	1,  // 10: analytics.AnalyticsService.GetTotalSales:output_type -> analytics.GetTotalSalesResponse
+	3,  // 11: analytics.AnalyticsService.GetAverageOrderValue:output_type -> analytics.GetAverageOrderValueResponse
+	5,  // 12: analytics.AnalyticsService.GetTopProducts:output_type -> analytics.GetTopProductsResponse
+	7,  // 13: analytics.AnalyticsService.GetLowStockProducts:output_type -> analytics.GetLowStockProductsResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_proto_AnalyticsService_proto_init() }
@@ -476,7 +572,7 @@ func file_proto_AnalyticsService_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_AnalyticsService_proto_rawDesc), len(file_proto_AnalyticsService_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

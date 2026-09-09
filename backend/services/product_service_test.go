@@ -51,6 +51,10 @@ func (m *mockProductRepo) DecrementStock(txn *sqlx.Tx, ctx context.Context, id s
 	return m.DecrementStockFunc(txn, ctx, id, qty)
 }
 
+func (m *mockProductRepo) GetLowStockProducts(ctx context.Context, threshold int) ([]models.Product, error) {
+	return nil, nil
+}
+
 func (m *mockProductRepo) BeginTransaction() (*sqlx.Tx, error) {
 	if m.BeginTransactionFunc == nil {
 		return nil, nil
