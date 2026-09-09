@@ -54,10 +54,15 @@ func main() {
 	// Initialize the GraphQL handler
 	gqlHandler := graphql.NewGraphQLHandler(productService, orderService, logger)
 
+	// Initialize analytics (shared by REST and gRPC)
+	analyticsService := services.NewAnalyticsService(orderRepo, productRepo, logger)
+	analyticsRESTHandler := rest.NewAnalyticsHandler(analyticsService, logger)
+
 	// Set up the HTTP server
 	mux := http.NewServeMux()
 	productHandler.RegisterRoutes(mux)
 	orderHandler.RegisterRoutes(mux)
+	analyticsRESTHandler.RegisterRoutes(mux)
 	gqlHandler.RegisterRoutes(mux)
 
 	port := utils.GetEnvVarString("PORT", "8013", logger)
@@ -83,7 +88,6 @@ func main() {
 	}()
 
 	// Initialize the Analytics & gRPC layers
-	analyticsService := services.NewAnalyticsService(orderRepo, productRepo, logger)
 	analyticsHandler := myGrpc.NewAnalyticsHandler(analyticsService, logger)
 	grpcProductHandler := myGrpc.NewProductHandler(productService, logger, validate)
 	grpcOrderHandler := myGrpc.NewOrderHandler(orderService, logger, validate)
