@@ -85,9 +85,13 @@ func main() {
 	// Initialize the Analytics & gRPC layers
 	analyticsService := services.NewAnalyticsService(orderRepo, productRepo, logger)
 	analyticsHandler := myGrpc.NewAnalyticsHandler(analyticsService, logger)
+	grpcProductHandler := myGrpc.NewProductHandler(productService, logger, validate)
+	grpcOrderHandler := myGrpc.NewOrderHandler(orderService, logger, validate)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterAnalyticsServiceServer(grpcServer, analyticsHandler)
+	pb.RegisterProductServiceServer(grpcServer, grpcProductHandler)
+	pb.RegisterOrderServiceServer(grpcServer, grpcOrderHandler)
 
 	// Start the gRPC server in a separate GR
 	go func() {
