@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/avnpl/go-march/models"
 	"github.com/avnpl/go-march/utils/log"
@@ -14,7 +15,9 @@ type OrderRepo interface {
 	Create(txn *sqlx.Tx, ctx context.Context, order models.Order) (models.Order, error)
 	FetchByID(ctx context.Context, id string) (models.Order, error)
 	FetchAll(ctx context.Context, limit int, offset int) ([]models.Order, error)
-	Delete()
+	GetTotalSales(ctx context.Context, start, end time.Time) (int, float64, error)
+	GetAvgOrderValue(ctx context.Context, start, end time.Time) (float64, error)
+	GetTopProducts(ctx context.Context, limit int) ([]models.ProductStat, error)
 }
 
 type orderRepo struct {
@@ -69,6 +72,49 @@ func (or orderRepo) FetchAll(ctx context.Context, limit int, offset int) ([]mode
 	return result, nil
 }
 
-func (or orderRepo) Delete() {
-	panic("unimplemented")
+func (or orderRepo) GetTotalSales(ctx context.Context, start, end time.Time) (int, float64, error) {
+	query := "select coalesce(sum(amount), 0), count(*) from orders where created_at >= $1 and created_at < $2"
+
+	var totalOrders int
+	var totalRevenue float64
+
+	err := or.db.QueryRowxContext(ctx, query, start, end).Scan(&totalRevenue, &totalOrders)
+	if err != nil {
+		log.Error(ctx, or.logger, "failed to get total sales analytics", zap.Time("start", start), zap.Time("end", end), zap.Error(err))
+		return 0, 0, fmt.Errorf("order_repo.GetTotalSales: %w", err)
+	}
+	return totalOrders, totalRevenue, nil
+}
+
+func (or orderRepo) GetAvgOrderValue(ctx context.Context, start, end time.Time) (float64, error) {
+	query := "select coalesce(avg(amount), 0) from orders where created_at >= $1 and created_at <  $2"
+
+	var result float64
+	err := or.db.QueryRowxContext(ctx, query, start, end).Scan(&result)
+	if err != nil {
+		log.Error(ctx, or.logger, "failed to get avg order values", zap.Time("start", start), zap.Time("end", end), zap.Error(err))
+		return 0, fmt.Errorf("order_repo.GetAvgOrderValue : %w", err)
+	}
+	return result, nil
+}
+
+func (or orderRepo) GetTopProducts(ctx context.Context, limit int) ([]models.ProductStat, error) {
+	query := `
+		select p.prod_id, p.prod_name,
+		       coalesce(sum(o.quantity), 0) as units_sold,
+		       coalesce(sum(o.amount), 0) as revenue
+		from orders o
+		join products p on p.prod_id = o.product_id
+		group by p.prod_id, p.prod_name
+		order by units_sold desc
+		limit $1
+	`
+
+	var result []models.ProductStat
+	err := or.db.SelectContext(ctx, &result, query, limit)
+	if err != nil {
+		log.Error(ctx, or.logger, "failed to get top products", zap.Int("limit", limit), zap.Error(err))
+		return nil, fmt.Errorf("order_repo.GetTopProducts: %w", err)
+	}
+	return result, nil
 }

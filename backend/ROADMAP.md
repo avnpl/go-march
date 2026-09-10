@@ -8,19 +8,19 @@
 
 ## Strategy
 
-Each API style demonstrates its strengths. No duplication of CRUD across APIs.
+Each API style started with a distinct purpose. Product/order CRUD now lives on both REST and gRPC, and analytics lives on both REST and gRPC — all through the same service layer. GraphQL stays unique for nested `Order.product`.
 
 ```
 Phase 1   REST Completion ────────────── complete end-to-end flow (products + orders + payments)
 Phase 2   GraphQL Enhancement ─────────── orders + nested products
-Phase 3   gRPC Analytics ──────────────── high-perf aggregations
+Phase 3   gRPC + REST analytics ────────── unary aggregations + catalog RPCs
 Phase 4   WebSocket Real-time ──────────── notifications
 Phase 5   Cleanup + Documentation ─────── reset mechanism + README
 Phase 6   User Authentication ─────────── token-based auth with middleware
 Phase 7   Perf polish ─────────────────── GraphQL nested product batch fetch (after core features)
 ```
 
-**Current status**: Product CRUD complete. Order CRUD complete. Phase 2 GraphQL order queries + nested `product` complete. Next: Phase 3 gRPC.
+**Current status**: Product CRUD complete. Order CRUD complete. Phase 2 GraphQL order queries + nested `product` complete. Phase 3 complete: unary analytics on gRPC and REST, plus gRPC product/order CRUD reusing the existing services (listen `:9090`).
 
 ## Progress Summary
 
@@ -30,7 +30,8 @@ Phase 7   Perf polish ─────────────────── 
 | **Phase 1.2** | ✅ Complete | Order CRUD: POST, GET list, GET by ID. No PATCH/DELETE/Payments. |
 | **Phase 1.3-1.4** | N/A | Out of scope — no payments, no order update/delete |
 | **Phase 2** | ✅ Complete | `getOrderByID`, `getAllOrders`, nested `product` (still 1+N; batch fetch is Phase 7) |
-| **Phase 3-4** | ⬜ Not Started | gRPC, WebSocket stubs |
+| **Phase 3** | ✅ Complete | Unary analytics (gRPC + REST) + gRPC product/order CRUD; port `:9090` |
+| **Phase 4** | ⬜ Not Started | WebSocket stubs |
 | **Phase 5** | ⬜ Not Started | TTL, README |
 | **Phase 6** | ⬜ TODO | User authentication with middleware (after Phase 5) |
 | **Phase 7** | ⬜ Later | Nested product batch-by-IDs (after Phases 3–6) |
@@ -64,6 +65,11 @@ Phase 7   Perf polish ─────────────────── 
 
 > No `user_id` column exists — auth (Phase 6) hasn't landed. No separate `Payment` model/table is used by the app; Phase 1.3/1.4 payments were dropped from scope (see Progress Summary). The `payments` table still exists in `migrations/003_create_payments.up.sql` but nothing in Go code reads or writes it.
 
+### ProductStat (analytics)
+- `prod_id` / `prod_name` / `stock` — same columns as Product
+- `units_sold` (int64) — `sum(quantity)` for top products; 0 for low-stock
+- `revenue` (float64) — `sum(amount)` for top products; 0 for low-stock
+
 > **Note**: ID is generated in the service layer. Format: `PR-` for products, `OR-` for orders, `PA-` for payments. Use short random string (7 chars) after prefix.
 
 ---
@@ -72,9 +78,9 @@ Phase 7   Perf polish ─────────────────── 
 
 | API | Resources | Purpose | Strength Demonstrated |
 |-----|-----------|---------|----------------------|
-| REST | Products + Orders | Complete CRUD + full flow | Standard REST patterns |
-| GraphQL | Orders (with nested products) | Filtering + nested queries | Flexible data fetching |
-| gRPC | Analytics | Aggregations | High-performance streaming |
+| REST | Products + Orders + Analytics | CRUD + aggregations | Standard REST patterns |
+| GraphQL | Products + Orders (nested `product`) | Queries + nested fetches | Flexible data fetching |
+| gRPC | Products + Orders + Analytics | Same CRUD/analytics as REST, typed contracts | Protobuf + unary RPCs |
 | WebSocket | Notifications | Real-time events | Push updates |
 
 ---
@@ -152,11 +158,20 @@ Phase 7   Perf polish ─────────────────── 
 - [x] **Error mapping** (do not expose internal DB messages): product missing → **404**; insufficient stock → **409 Conflict** (or **422 Unprocessable Entity**, project-wide pick one); invalid body / `quantity <= 0` → **400**; transaction / unexpected failures → **500** with generic client message.
 - [ ] Optional later: retries, idempotency keys, or row-level locking strategy if contention shows up in tests.
 
+## 1.5 Analytics (REST)
+
+Same `AnalyticsService` as gRPC. Query params; dates are RFC3339.
+
+- [x] `GET /analytics/sales?start_date=&end_date=` — `count(*)` + `sum(amount)` in range
+- [x] `GET /analytics/average-order-value?start_date=&end_date=` — `avg(amount)` in range
+- [x] `GET /analytics/top-products?limit=` — join orders→products, order by units sold (`limit` default 10)
+- [x] `GET /analytics/low-stock?threshold=` — products with `stock <= threshold`
+
 ---
 
 # Phase 2: GraphQL Enhancement
 
-Product queries and mutations were already in the schema before this phase. Phase 2 adds orders. REST still owns create/update/delete for orders.
+Product queries and mutations were already in the schema before this phase. Phase 2 adds orders. REST and gRPC own order writes; GraphQL is read-only for orders.
 
 ## 2.1 GraphQL Schema
 
@@ -215,52 +230,66 @@ Field names match the Go `Order` struct, so GraphQL can resolve scalars without 
 
 ---
 
-# Phase 3: gRPC Analytics
+# Phase 3: gRPC Analytics + Catalog
+
+**Status**: ✅ Complete — unary analytics, product/order RPCs matching REST, shared `AnalyticsService` also used by REST. Server listens on `:9090` (not `:50051`). Streaming list RPCs were dropped in favor of unary `repeated` responses.
 
 ## 3.1 Protocol Buffer Definition
 
-**File**: `proto/analytics.proto`
+**Files** (under `api/grpc/proto/`):
+- `AnalyticsService.proto` — package `analytics`
+- `ProductService.proto` / `OrderService.proto` — package `catalog`
+- `option go_package = "github.com/avnpl/go-march/api/grpc"` (generated Go lives in `api/grpc/proto/`, imported as that path)
 
+**Analytics** (all unary):
 ```protobuf
 service AnalyticsService {
   rpc GetTotalSales(GetTotalSalesRequest) returns (GetTotalSalesResponse);
   rpc GetAverageOrderValue(GetAverageOrderValueRequest) returns (GetAverageOrderValueResponse);
-  rpc GetTopProducts(GetTopProductsRequest) returns (stream ProductStat);
-  rpc GetLowStockProducts(GetLowStockProductsRequest) returns (stream ProductStat);
-}
-```
-
-**Messages**:
-```protobuf
-message GetTotalSalesRequest {
-  // optional date range
+  rpc GetTopProducts(GetTopProductsRequest) returns (GetTopProductsResponse);
+  rpc GetLowStockProducts(GetLowStockProductsRequest) returns (GetLowStockProductsResponse);
 }
 
-message GetTotalSalesResponse {
-  int64 total_orders = 1;
-  double total_revenue = 2;
+message GetTopProductsResponse {
+  repeated ProductStat products = 1;
+}
+
+message GetLowStockProductsResponse {
+  repeated ProductStat products = 1;
 }
 
 message ProductStat {
-  int64 product_id = 1;
+  string product_id = 1;
   string product_name = 2;
   int64 units_sold = 3;
   double revenue = 4;
+  int32 stock = 5;
 }
 ```
 
-## 3.2 Implementation
+**Catalog** (mirrors REST; reuses `ProductService` / `OrderService`):
+- `catalog.ProductService`: `CreateProduct`, `GetProduct`, `ListProducts`, `UpdateProduct`, `DeleteProduct`
+- `catalog.OrderService`: `CreateOrder`, `GetOrder`, `ListOrders`
 
-- [ ] Generate Go code from proto
-- [ ] Create `AnalyticsService` in `services/`
-- [ ] Add aggregate SQL queries to repo
-- [ ] Implement gRPC server in `api/grpc/`
-- [ ] Run on separate port (`:50051`)
+> Original spec used `int64 product_id` in `ProductStat` and `stream ProductStat` for list RPCs. IDs are strings (`PR-XXXXXX`). Lists are unary.
 
-## 3.3 Streaming (Optional)
+## 3.2 Implementation (done)
 
-- [ ] Server-side streaming for top products / low stock
-- [ ] Demonstrates gRPC streaming capability
+- [x] Proto `go_package` + `google.golang.org/grpc` in `go.mod`
+- [x] Analytics RPCs/messages, regenerate `.pb.go` / `_grpc.pb.go`
+- [x] Aggregate SQL on `OrderRepo` / `ProductRepo`:
+  - `GetTotalSales` — `coalesce(sum(amount), 0)`, `count(*)` where `created_at >= start and created_at < end`
+  - `GetAvgOrderValue` — `coalesce(avg(amount), 0)` over the same range
+  - `GetTopProducts` — join `orders` → `products`, `group by` product, `sum(quantity)` / `sum(amount)`, `order by units_sold desc`, `limit`
+  - `GetLowStockProducts` — `select * from products where stock <= $1`
+- [x] `services/analytics_service.go` — plain Go types in/out; no proto types
+- [x] Handlers: `api/grpc/analytics_handler.go`, `product_handler.go`, `order_handler.go` (not `server.go`)
+- [x] Sentinel errors → gRPC codes in `api/grpc/errors.go` (same mapping policy as REST)
+- [x] Wire in `main.go`: `grpc.NewServer()` on `:9090`, register all three services, graceful stop with the HTTP 10s timeout
+
+## 3.3 Streaming
+
+- [x] Dropped — `GetTopProducts` / `GetLowStockProducts` are unary list responses (same shape as REST JSON arrays)
 
 ---
 
@@ -428,11 +457,11 @@ All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 ┌────────────────────────────────────────────────────────────────┐
 │  API Handlers (REST / GraphQL / gRPC / WebSocket)              │
 ├────────────────────────────────────────────────────────────────┤
-│  Services (ProductService, OrderService, PaymentService...)    │
+│  Services (ProductService, OrderService, AnalyticsService)     │
 │  - Business logic only                                         │
 │  - No HTTP/gRPC/WS knowledge                                   │
 ├────────────────────────────────────────────────────────────────┤
-│  Repos (ProductRepo, OrderRepo, PaymentRepo...)                │
+│  Repos (ProductRepo, OrderRepo)                                │
 │  - Database access only                                        │
 │  - No business logic                                           │
 ├────────────────────────────────────────────────────────────────┤
@@ -486,6 +515,7 @@ All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 | `jmoiron/sqlx` | Database access |
 | `go.uber.org/zap` | Structured logging |
 | `graphql-go/graphql` | GraphQL implementation |
+| `google.golang.org/grpc` | gRPC server + codegen |
 | `nhooyr.io/websocket` | WebSocket implementation |
 
 ---
@@ -494,13 +524,17 @@ All API styles (REST, GraphQL, gRPC, WebSocket) use the **same service layer**:
 
 ## REST (`:8013` by default, configurable via `PORT`)
 
-**Current implementation (Phase 1 complete)**
+**Current implementation**
 ```
-/products         POST, GET (list)
-/products/{id}    GET, PATCH, DELETE
-/orders           POST, GET (list)
-/orders/{id}      GET
-/graphql          POST
+/products                          POST, GET (list)
+/products/{id}                     GET, PATCH, DELETE
+/orders                            POST, GET (list)
+/orders/{id}                       GET
+/analytics/sales                   GET  ?start_date&end_date (RFC3339)
+/analytics/average-order-value     GET  ?start_date&end_date (RFC3339)
+/analytics/top-products            GET  ?limit (default 10)
+/analytics/low-stock               GET  ?threshold
+/graphql                           POST
 ```
 
 ## Auth (`/auth`, same port as REST)
@@ -512,10 +546,12 @@ POST /auth/token     Refresh token (extends expiry)
 
 > All endpoints require: `Authorization: Bearer <token>` header
 
-## gRPC (`:50051`)
+## gRPC (`:9090`)
 
 ```
-AnalyticsService: GetTotalSales, GetAverageOrderValue, GetTopProducts, GetLowStockProducts
+catalog.ProductService:  CreateProduct, GetProduct, ListProducts, UpdateProduct, DeleteProduct
+catalog.OrderService:    CreateOrder, GetOrder, ListOrders
+analytics.AnalyticsService: GetTotalSales, GetAverageOrderValue, GetTopProducts, GetLowStockProducts
 ```
 
 ## WebSocket (`/ws`, same port as REST)

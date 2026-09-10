@@ -22,6 +22,7 @@ type ProductRepo interface {
 	UpdateByID(ctx context.Context, p *models.UpdateProductReq) (models.Product, error)
 	DeleteByID(ctx context.Context, id string) (models.Product, error)
 	DecrementStock(txn *sqlx.Tx, ctx context.Context, id string, qty int) (int, error)
+	GetLowStockProducts(ctx context.Context, threshold int) ([]models.Product, error)
 	BeginTransaction() (*sqlx.Tx, error)
 }
 
@@ -163,6 +164,18 @@ func (r productRepo) DecrementStock(txn *sqlx.Tx, ctx context.Context, id string
 		return 0, fmt.Errorf("product_repo.DecrementStock: %w", err)
 	}
 	return newStock, nil
+}
+
+func (r productRepo) GetLowStockProducts(ctx context.Context, threshold int) ([]models.Product, error) {
+	query := "select * from products where stock <= $1 order by stock asc"
+
+	var result []models.Product
+	err := r.db.SelectContext(ctx, &result, query, threshold)
+	if err != nil {
+		log.Error(ctx, r.logger, "failed to fetch low stock products", zap.Int("threshold", threshold), zap.Error(err))
+		return nil, fmt.Errorf("product_repo.GetLowStockProducts: %w", err)
+	}
+	return result, nil
 }
 
 func (r productRepo) BeginTransaction() (*sqlx.Tx, error) {

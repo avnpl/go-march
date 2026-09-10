@@ -1,0 +1,55 @@
+syntax = "proto3";
+package analytics;
+
+import "google/protobuf/timestamp.proto";
+option go_package = "github.com/avnpl/go-march/api/grpc";
+
+service AnalyticsService {
+  rpc GetTotalSales(GetTotalSalesRequest) returns (GetTotalSalesResponse);
+  rpc GetAverageOrderValue(GetAverageOrderValueRequest) returns (GetAverageOrderValueResponse);
+  rpc GetTopProducts(GetTopProductsRequest) returns (GetTopProductsResponse);
+  rpc GetLowStockProducts(GetLowStockProductsRequest) returns (GetLowStockProductsResponse);
+}
+
+message GetTotalSalesRequest {
+  google.protobuf.Timestamp start_date = 1;
+  google.protobuf.Timestamp end_date   = 2;
+}
+
+message GetTotalSalesResponse {
+  int64  total_orders  = 1;
+  double total_revenue = 2;
+}
+
+message GetAverageOrderValueRequest {
+  google.protobuf.Timestamp start_date = 1;
+  google.protobuf.Timestamp end_date   = 2;
+}
+
+message GetAverageOrderValueResponse {
+  double average_order_value = 1;
+}
+
+message GetTopProductsRequest {
+  int32 limit = 1;
+}
+
+message GetTopProductsResponse {
+  repeated ProductStat products = 1;
+}
+
+message GetLowStockProductsRequest {
+  int32 threshold = 1;
+}
+
+message GetLowStockProductsResponse {
+  repeated ProductStat products = 1;
+}
+
+message ProductStat {
+  string product_id   = 1;
+  string product_name = 2;
+  int64  units_sold   = 3;
+  double revenue      = 4;
+  int32  stock        = 5;
+}

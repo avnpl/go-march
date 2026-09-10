@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,16 +12,19 @@ import (
 	"time"
 
 	"github.com/avnpl/go-march/api/graphql"
+	myGrpc "github.com/avnpl/go-march/api/grpc"
 	"github.com/avnpl/go-march/api/rest"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 
+	pb "github.com/avnpl/go-march/api/grpc/proto"
 	"github.com/avnpl/go-march/repos"
 	"github.com/avnpl/go-march/services"
 	"github.com/avnpl/go-march/utils"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -50,10 +54,15 @@ func main() {
 	// Initialize the GraphQL handler
 	gqlHandler := graphql.NewGraphQLHandler(productService, orderService, logger)
 
+	// Initialize analytics (shared by REST and gRPC)
+	analyticsService := services.NewAnalyticsService(orderRepo, productRepo, logger)
+	analyticsRESTHandler := rest.NewAnalyticsHandler(analyticsService, logger)
+
 	// Set up the HTTP server
 	mux := http.NewServeMux()
 	productHandler.RegisterRoutes(mux)
 	orderHandler.RegisterRoutes(mux)
+	analyticsRESTHandler.RegisterRoutes(mux)
 	gqlHandler.RegisterRoutes(mux)
 
 	port := utils.GetEnvVarString("PORT", "8013", logger)
@@ -78,6 +87,30 @@ func main() {
 		}
 	}()
 
+	// Initialize the Analytics & gRPC layers
+	analyticsHandler := myGrpc.NewAnalyticsHandler(analyticsService, logger)
+	grpcProductHandler := myGrpc.NewProductHandler(productService, logger, validate)
+	grpcOrderHandler := myGrpc.NewOrderHandler(orderService, logger, validate)
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterAnalyticsServiceServer(grpcServer, analyticsHandler)
+	pb.RegisterProductServiceServer(grpcServer, grpcProductHandler)
+	pb.RegisterOrderServiceServer(grpcServer, grpcOrderHandler)
+
+	// Start the gRPC server in a separate GR
+	go func() {
+		lis, err := net.Listen("tcp", ":9090")
+		if err != nil {
+			logger.Fatal("failed to listen for gRPC", zap.Error(err))
+		}
+
+		logger.Info("gRPC server listening on :9090")
+		err = grpcServer.Serve(lis)
+		if err != nil {
+			logger.Fatal("failed to serve gRPC", zap.Error(err))
+		}
+	}()
+
 	// Graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -86,6 +119,26 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	server.Shutdown(ctx)
+
+	// shut down http server
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("HTTP server shutdown failed", zap.Error(err))
+	}
+
+	// shut down the grpc server
+	grpcStopped := make(chan struct{})
+	go func() {
+		grpcServer.GracefulStop()
+		close(grpcStopped)
+	}()
+
+	select {
+	case <-grpcStopped:
+		// do nothing. gRPC server stopped successfully
+	case <-ctx.Done():
+		logger.Error("gRPC server shutdown failed", zap.Error(ctx.Err()))
+		grpcServer.Stop()
+	}
+
 	logger.Info("goodbye")
 }

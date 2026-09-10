@@ -1,0 +1,52 @@
+syntax = "proto3";
+package catalog;
+
+import "google/protobuf/timestamp.proto";
+option go_package = "github.com/avnpl/go-march/api/grpc";
+
+service ProductService {
+  rpc CreateProduct(CreateProductRequest) returns (Product);
+  rpc GetProduct(GetProductRequest) returns (Product);
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+  rpc UpdateProduct(UpdateProductRequest) returns (Product);
+  rpc DeleteProduct(DeleteProductRequest) returns (Product);
+}
+
+message Product {
+  string prod_id = 1;
+  string prod_name = 2;
+  double price = 3;
+  int32 stock = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message CreateProductRequest {
+  string name = 1;
+  double price = 2;
+  int32 stock = 3;
+}
+
+message GetProductRequest {
+  string prod_id = 1;
+}
+
+message ListProductsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListProductsResponse {
+  repeated Product products = 1;
+}
+
+message UpdateProductRequest {
+  string prod_id = 1;
+  optional string name = 2;
+  optional double price = 3;
+  optional int32 stock = 4;
+}
+
+message DeleteProductRequest {
+  string prod_id = 1;
+}
